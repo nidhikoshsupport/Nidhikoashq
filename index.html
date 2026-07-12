@@ -2494,6 +2494,7 @@ react-dom/cjs/react-dom-client.production.js:
 
     // Scrollable grey area with white inner page
     var wrap = document.createElement('div');
+    wrap.id = 'ft-pdf-wrap';
     wrap.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#cbd5e1;padding:8px;';
     var inner = document.createElement('div');
     inner.id = 'ft-pdf-inner';
@@ -2548,8 +2549,33 @@ react-dom/cjs/react-dom-client.production.js:
     document.getElementById('ft-pdf-close-btn').onclick = function(){ if(ov.parentNode) ov.parentNode.removeChild(ov); };
     document.getElementById('ft-pdf-print-btn').onclick = function(){
       tb.style.display = 'none';
-      window.print();
-      setTimeout(function(){ tb.style.display = 'flex'; }, 500);
+      // Isolate the statement content for printing: position:fixed overlays and
+      // scrollable/zoomed containers often print blank or clipped, so we force
+      // everything else to hide and lay this content out normally for the print pass.
+      var printStyle = document.createElement('style');
+      printStyle.id = 'ft-pdf-print-style';
+      printStyle.textContent =
+        '@media print {' +
+        '  body * { visibility: hidden !important; }' +
+        '  #ft-pdf-ov, #ft-pdf-ov * { visibility: visible !important; }' +
+        '  #ft-pdf-ov { position: static !important; background: #fff !important; height: auto !important; }' +
+        '  #ft-pdf-wrap { position: static !important; overflow: visible !important; height: auto !important; background: #fff !important; padding: 0 !important; }' +
+        '  #ft-pdf-inner { position: static !important; transform: none !important; width: 100% !important; box-shadow: none !important; }' +
+        '}';
+      document.head.appendChild(printStyle);
+      var prevTransform2 = inner.style.transform;
+      var prevWidth2 = inner.style.width;
+      inner.style.transform = 'none';
+      inner.style.width = '100%';
+      setTimeout(function(){
+        window.print();
+        setTimeout(function(){
+          tb.style.display = 'flex';
+          inner.style.transform = prevTransform2;
+          inner.style.width = prevWidth2;
+          if (printStyle.parentNode) printStyle.parentNode.removeChild(printStyle);
+        }, 500);
+      }, 50);
     };
     document.getElementById('ft-pdf-share-btn').onclick = function(){
       sharePDFOnWhatsApp(inner, title, this);
