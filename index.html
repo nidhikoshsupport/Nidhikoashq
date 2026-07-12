@@ -103,14 +103,21 @@
   }
 })();
 </script>
-<script id="firestore-members-sync-js">
+<script id="firestore-org-sync-js">
 (function(){
-  // ===== NidhiKosh Firestore Members Sync (write-through + soft-refresh) =====
+  // ===== NidhiKosh Firestore Org-Data Sync (poll-based, multi-domain) =====
+  // Covers: members, banks, ledger (transactions), permissions, customRoles,
+  // guests, incomeCats, expenseCats, mnSettings, penaltySettings, stmtNo, stmtMo.
+  // All stored as fields on a single orgs/{orgId} document (merge:true), mirroring
+  // the existing "ft_org_{orgId}_{suffix}" localStorage key shape 1:1.
   var _origSetItem = localStorage.setItem.bind(localStorage);
   var _origGetItem = localStorage.getItem.bind(localStorage);
-  var _memberKeyRe = /^ft_org_(.+)_members$/;
-  var _lastPushed = {}; // orgId -> JSON string, to avoid redundant writes/loops
-  var _unsubMap = {};   // orgId -> unsubscribe fn for onSnapshot
+  var _SUFFIXES = ['members','banks','ledger','permissions','customRoles','guests',
+                    'incomeCats','expenseCats','mnSettings','penaltySettings','stmtNo','stmtMo'];
+  var _keyRe = new RegExp('^ft_org_(.+)_(' + _SUFFIXES.join('|') + ')$');
+  var _lastPushed = {};   // "orgId:suffix" -> JSON string, avoid redundant writes/echo loops
+  var _unsubMap = {};     // orgId -> unsubscribe fn for onSnapshot
+  var _pollKnown = {};    // "orgId:suffix" -> last known JSON string
 
   function _waitForAuth(cb){
     if (window.__fbAuthReady) { cb(); return; }
@@ -120,26 +127,22 @@
     });
   }
 
-  function _pushMembersToCloud(orgId, jsonStr){
+  function _pushFieldToCloud(orgId, suffix, jsonStr){
     try{
-      if(window.__ftDebugLog)window.__ftDebugLog('Push attempt for org '+orgId,'info');
-      if (!window.__db) { if(window.__ftDebugLog)window.__ftDebugLog('__db not ready, skipping push','error'); return; }
-      if (_lastPushed[orgId] === jsonStr) { if(window.__ftDebugLog)window.__ftDebugLog('Push skipped (no change)','info'); return; }
-      _lastPushed[orgId] = jsonStr;
-      var membersArr;
-      try { membersArr = JSON.parse(jsonStr); } catch(e){ if(window.__ftDebugLog)window.__ftDebugLog('JSON parse failed: '+e.message,'error'); return; }
-      window.__db.collection('orgs').doc(orgId).set({
-        members: membersArr,
-        _membersUpdatedAt: new Date().toISOString()
-      }, { merge: true }).then(function(){
-        console.log('[ft-sync] members pushed to cloud for org', orgId);
-        if(window.__ftDebugLog)window.__ftDebugLog('Members pushed to cloud (org '+orgId+')','ok');
+      var pk = orgId + ':' + suffix;
+      if (!window.__db) { if(window.__ftDebugLog)window.__ftDebugLog('__db not ready, skip push ('+suffix+')','error'); return; }
+      if (_lastPushed[pk] === jsonStr) return;
+      _lastPushed[pk] = jsonStr;
+      var parsed;
+      try { parsed = JSON.parse(jsonStr); } catch(e){ if(window.__ftDebugLog)window.__ftDebugLog('JSON parse failed ('+suffix+'): '+e.message,'error'); return; }
+      var payload = {}; payload[suffix] = parsed; payload['_'+suffix+'UpdatedAt'] = new Date().toISOString();
+      window.__db.collection('orgs').doc(orgId).set(payload, { merge: true }).then(function(){
+        if(window.__ftDebugLog)window.__ftDebugLog('Pushed '+suffix+' to cloud (org '+orgId+')','ok');
       }).catch(function(e){
-        console.error('[ft-sync] members push failed:', e);
-        if(window.__ftDebugLog)window.__ftDebugLog('Members push FAILED (org '+orgId+'): '+(e&&e.message||e),'error');
+        if(window.__ftDebugLog)window.__ftDebugLog(suffix+' push FAILED (org '+orgId+'): '+(e&&e.message||e),'error');
       });
     }catch(outerErr){
-      if(window.__ftDebugLog)window.__ftDebugLog('_pushMembersToCloud THREW: '+(outerErr&&outerErr.message||outerErr),'error');
+      if(window.__ftDebugLog)window.__ftDebugLog('_pushFieldToCloud THREW ('+suffix+'): '+(outerErr&&outerErr.message||outerErr),'error');
     }
   }
 
@@ -166,70 +169,67 @@
       .onSnapshot(function(doc){
         if (!doc.exists) return;
         var data = doc.data();
-        if (!data || !data.members) return;
-        var jsonStr = JSON.stringify(data.members);
-        var key = 'ft_org_' + orgId + '_members';
-        var localVal = _origGetItem(key);
-        if (jsonStr === localVal) return; // no change
-        if (jsonStr === _lastPushed[orgId]) {
-          // this is just our own write echoing back
-          _lastPushed[orgId] = jsonStr;
-          return;
-        }
-        // Genuine remote change
-        _lastPushed[orgId] = jsonStr;
-        _origSetItem(key, jsonStr);
-        console.log('[ft-sync] remote members update applied for org', orgId);
-        if(window.__ftDebugLog)window.__ftDebugLog('Remote members update applied (org '+orgId+')','ok');
-        window.dispatchEvent(new CustomEvent('ft-cloud-members-updated', { detail: { orgId: orgId } }));
-        _showSyncToast('☁️ Members data cloud वरून update झालं');
+        if (!data) return;
+        _SUFFIXES.forEach(function(suffix){
+          if (!(suffix in data)) return;
+          var jsonStr = JSON.stringify(data[suffix]);
+          var key = 'ft_org_' + orgId + '_' + suffix;
+          var pk = orgId + ':' + suffix;
+          var localVal = _origGetItem(key);
+          if (jsonStr === localVal) return;
+          if (jsonStr === _lastPushed[pk]) { _lastPushed[pk] = jsonStr; return; }
+          // Genuine remote change
+          _lastPushed[pk] = jsonStr;
+          _pollKnown[pk] = jsonStr;
+          _origSetItem(key, jsonStr);
+          if(window.__ftDebugLog)window.__ftDebugLog('Remote update applied: '+suffix+' (org '+orgId+')','ok');
+          window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: suffix } }));
+          _showSyncToast('☁️ ' + suffix + ' cloud वरून update झालं');
+        });
       }, function(err){
-        console.error('[ft-sync] onSnapshot error:', err);
         if(window.__ftDebugLog)window.__ftDebugLog('onSnapshot ERROR (org '+orgId+'): '+(err&&err.message||err),'error');
       });
   }
 
-  // NOTE: We do NOT rely on overriding localStorage.setItem, since this can silently
-  // fail to take effect in some iOS Safari / WKWebView versions with no error thrown.
+  // We do NOT rely on overriding localStorage.setItem, since that silently failed to
+  // take effect in some iOS Safari/WKWebView versions with no error thrown.
   // Instead we POLL localStorage periodically and diff against last-known values.
-  var _pollKnown = {}; // orgId -> last known JSON string for members
-
   function _pollScan(){
     try{
       for (var i = 0; i < localStorage.length; i++){
         var k = localStorage.key(i);
-        var m = k && _memberKeyRe.exec(k);
+        var m = k && _keyRe.exec(k);
         if (!m) continue;
-        var orgId = m[1];
+        var orgId = m[1], suffix = m[2];
+        var pk = orgId + ':' + suffix;
         var val = _origGetItem(k);
-        if (_pollKnown[orgId] === val) continue;
-        _pollKnown[orgId] = val;
-        if(window.__ftDebugLog)window.__ftDebugLog('Poll detected change for key: '+k,'info');
-        (function(_oid, _v){
+        if (_pollKnown[pk] === val) continue;
+        _pollKnown[pk] = val;
+        (function(_oid, _suf, _v){
           _waitForAuth(function(){
-            _pushMembersToCloud(_oid, _v);
+            _pushFieldToCloud(_oid, _suf, _v);
             _subscribeOrg(_oid);
           });
-        })(orgId, val);
+        })(orgId, suffix, val);
       }
     }catch(pollErr){
       if(window.__ftDebugLog)window.__ftDebugLog('Poll scan FAILED: '+(pollErr&&pollErr.message||pollErr),'error');
     }
   }
-  if(window.__ftDebugLog)window.__ftDebugLog('Poll-based sync active (checks every 2s)','info');
+  if(window.__ftDebugLog)window.__ftDebugLog('Poll-based org sync active (members+banks+ledger+permissions+customRoles+guests+categories, checks every 2s)','info');
   setInterval(_pollScan, 2000);
   _pollScan();
 
-  // On load, if an active org already exists, subscribe immediately
+  // On load, subscribe immediately for any org already present locally
   _waitForAuth(function(){
     try{
       for (var i = 0; i < localStorage.length; i++){
         var k = localStorage.key(i);
-        var m = k && _memberKeyRe.exec(k);
+        var m = k && _keyRe.exec(k);
         if (m) _subscribeOrg(m[1]);
       }
-    }catch(e){ console.error('[ft-sync] init subscribe scan failed:', e); if(window.__ftDebugLog)window.__ftDebugLog('Init subscribe scan FAILED: '+(e&&e.message||e),'error'); }
-    if(window.__ftDebugLog)window.__ftDebugLog('Members sync shim ready','ok');
+    }catch(e){ if(window.__ftDebugLog)window.__ftDebugLog('Init subscribe scan FAILED: '+(e&&e.message||e),'error'); }
+    if(window.__ftDebugLog)window.__ftDebugLog('Org sync shim ready','ok');
   });
 })();
 </script>
