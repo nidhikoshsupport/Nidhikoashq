@@ -192,6 +192,7 @@
   // Override setItem: keep normal behavior, add cloud push for members keys
   localStorage.setItem = function(key, value){
     _origSetItem(key, value);
+    if (key === '__ft_override_probe__' && window.__ftDebugLog) window.__ftDebugLog('OVERRIDE PROBE: setItem override IS working','ok');
     try{
       var m = _memberKeyRe.exec(key);
       if (m) {
@@ -217,6 +218,14 @@
       }
     }catch(e){ console.error('[ft-sync] init subscribe scan failed:', e); if(window.__ftDebugLog)window.__ftDebugLog('Init subscribe scan FAILED: '+(e&&e.message||e),'error'); }
     if(window.__ftDebugLog)window.__ftDebugLog('Members sync shim ready','ok');
+    setTimeout(function(){
+      try{
+        localStorage.setItem('__ft_override_probe__','1');
+        localStorage.removeItem('__ft_override_probe__');
+      }catch(e){
+        if(window.__ftDebugLog)window.__ftDebugLog('Probe write FAILED: '+(e&&e.message||e),'error');
+      }
+    }, 500);
   });
 })();
 </script>
