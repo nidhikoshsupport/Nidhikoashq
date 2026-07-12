@@ -121,21 +121,26 @@
   }
 
   function _pushMembersToCloud(orgId, jsonStr){
-    if (!window.__db) return;
-    if (_lastPushed[orgId] === jsonStr) return; // avoid echo loop
-    _lastPushed[orgId] = jsonStr;
-    var membersArr;
-    try { membersArr = JSON.parse(jsonStr); } catch(e){ return; }
-    window.__db.collection('orgs').doc(orgId).set({
-      members: membersArr,
-      _membersUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).then(function(){
-      console.log('[ft-sync] members pushed to cloud for org', orgId);
-      if(window.__ftDebugLog)window.__ftDebugLog('Members pushed to cloud (org '+orgId+')','ok');
-    }).catch(function(e){
-      console.error('[ft-sync] members push failed:', e);
-      if(window.__ftDebugLog)window.__ftDebugLog('Members push FAILED (org '+orgId+'): '+(e&&e.message||e),'error');
-    });
+    try{
+      if(window.__ftDebugLog)window.__ftDebugLog('Push attempt for org '+orgId,'info');
+      if (!window.__db) { if(window.__ftDebugLog)window.__ftDebugLog('__db not ready, skipping push','error'); return; }
+      if (_lastPushed[orgId] === jsonStr) { if(window.__ftDebugLog)window.__ftDebugLog('Push skipped (no change)','info'); return; }
+      _lastPushed[orgId] = jsonStr;
+      var membersArr;
+      try { membersArr = JSON.parse(jsonStr); } catch(e){ if(window.__ftDebugLog)window.__ftDebugLog('JSON parse failed: '+e.message,'error'); return; }
+      window.__db.collection('orgs').doc(orgId).set({
+        members: membersArr,
+        _membersUpdatedAt: new Date().toISOString()
+      }, { merge: true }).then(function(){
+        console.log('[ft-sync] members pushed to cloud for org', orgId);
+        if(window.__ftDebugLog)window.__ftDebugLog('Members pushed to cloud (org '+orgId+')','ok');
+      }).catch(function(e){
+        console.error('[ft-sync] members push failed:', e);
+        if(window.__ftDebugLog)window.__ftDebugLog('Members push FAILED (org '+orgId+'): '+(e&&e.message||e),'error');
+      });
+    }catch(outerErr){
+      if(window.__ftDebugLog)window.__ftDebugLog('_pushMembersToCloud THREW: '+(outerErr&&outerErr.message||outerErr),'error');
+    }
   }
 
   function _showSyncToast(msg){
@@ -187,13 +192,18 @@
   // Override setItem: keep normal behavior, add cloud push for members keys
   localStorage.setItem = function(key, value){
     _origSetItem(key, value);
-    var m = _memberKeyRe.exec(key);
-    if (m) {
-      var orgId = m[1];
-      _waitForAuth(function(){
-        _pushMembersToCloud(orgId, value);
-        _subscribeOrg(orgId); // ensure we're listening for remote changes too
-      });
+    try{
+      var m = _memberKeyRe.exec(key);
+      if (m) {
+        var orgId = m[1];
+        if(window.__ftDebugLog)window.__ftDebugLog('setItem intercepted for key: '+key,'info');
+        _waitForAuth(function(){
+          _pushMembersToCloud(orgId, value);
+          _subscribeOrg(orgId); // ensure we're listening for remote changes too
+        });
+      }
+    }catch(shimErr){
+      if(window.__ftDebugLog)window.__ftDebugLog('setItem override THREW: '+(shimErr&&shimErr.message||shimErr),'error');
     }
   };
 
