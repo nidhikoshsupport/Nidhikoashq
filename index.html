@@ -328,15 +328,49 @@
 
         var joinedOrgs = u.joinedOrgs || [];
         var orgIds = joinedOrgs.map(function(j){ return j.orgId; }).filter(Boolean);
-        if (!orgIds.length) { cb(false, 'No organisations linked to this account.'); return; }
 
-        var fetches = orgIds.map(function(orgId){
-          return window.__db.collection('orgs').doc(orgId).get().then(function(orgDoc){
-            return { orgId: orgId, data: orgDoc.exists ? orgDoc.data() : null };
+        function _proceedWithOrgIds(finalOrgIds){
+          if (!finalOrgIds.length) { cb(false, 'No organisations linked to this account.'); return; }
+          var fetches = finalOrgIds.map(function(orgId){
+            return window.__db.collection('orgs').doc(orgId).get().then(function(orgDoc){
+              return { orgId: orgId, data: orgDoc.exists ? orgDoc.data() : null };
+            });
           });
-        });
+          Promise.all(fetches).then(_applyResults).catch(function(e){
+            if(window.__ftDebugLog)window.__ftDebugLog('Cloud login org fetch FAILED: '+(e&&e.message||e),'error');
+            cb(false, 'Could not reach cloud, try again.');
+          });
+        }
 
-        Promise.all(fetches).then(function(results){
+        if (orgIds.length) {
+          _proceedWithOrgIds(orgIds);
+          return;
+        }
+
+        // Fallback: joinedOrgs was empty/stale in the cloud record. Mirror the app's
+        // local bootstrap behavior by scanning all orgs for a member whose phone
+        // matches this mobile number.
+        if(window.__ftDebugLog)window.__ftDebugLog('joinedOrgs empty, scanning orgs by member phone match...','info');
+        window.__db.collection('orgs').get().then(function(snap){
+          var matchedIds = [];
+          snap.forEach(function(doc){
+            var d = doc.data();
+            if (d && Array.isArray(d.members)) {
+              var hit = d.members.some(function(m){
+                return m && String(m.phone||'').replace(/\D/g,'').slice(-10) === mob;
+              });
+              if (hit) matchedIds.push(doc.id);
+            }
+          });
+          if (!matchedIds.length) { cb(false, 'No organisations linked to this account.'); return; }
+          _proceedWithOrgIds(matchedIds);
+        }).catch(function(e){
+          if(window.__ftDebugLog)window.__ftDebugLog('Org phone-match scan FAILED: '+(e&&e.message||e),'error');
+          cb(false, 'No organisations linked to this account.');
+        });
+        return;
+
+        function _applyResults(results){
           try{
             var orgsMeta = JSON.parse(localStorage.getItem('ft_global_orgs') || '[]');
             results.forEach(function(r){
@@ -373,17 +407,14 @@
             localStorage.setItem('ft_appUsers', JSON.stringify(allUsers));
             localStorage.setItem('ft_appUser', JSON.stringify(u));
 
-            if(window.__ftDebugLog)window.__ftDebugLog('Cloud login data restored for '+orgIds.length+' org(s), reloading...','ok');
+            if(window.__ftDebugLog)window.__ftDebugLog('Cloud login data restored for '+results.length+' org(s), reloading...','ok');
             cb(true);
             setTimeout(function(){ location.reload(); }, 300);
           }catch(applyErr){
             if(window.__ftDebugLog)window.__ftDebugLog('Cloud login apply THREW: '+(applyErr&&applyErr.message||applyErr),'error');
             cb(false, 'Something went wrong restoring your data.');
           }
-        }).catch(function(e){
-          if(window.__ftDebugLog)window.__ftDebugLog('Cloud login org fetch FAILED: '+(e&&e.message||e),'error');
-          cb(false, 'Could not reach cloud, try again.');
-        });
+        }
       }).catch(function(e){
         if(window.__ftDebugLog)window.__ftDebugLog('Cloud login lookup FAILED: '+(e&&e.message||e),'error');
         cb(false, 'Could not reach cloud, try again.');
