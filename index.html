@@ -2608,10 +2608,29 @@ react-dom/cjs/react-dom-client.production.js:
       innerEl.style.transform = 'none';
       innerEl.style.width = '794px';
 
-      return window.html2canvas(innerEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+      // Wait for the browser to actually reflow/repaint the style change above
+      // before capturing -- capturing immediately after a style change can produce
+      // a blank canvas because layout hasn't happened yet.
+      var _waitForReflow = new Promise(function(resolve){
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){
+            setTimeout(resolve, 50);
+          });
+        });
+      });
+
+      return _waitForReflow.then(function(){
+        return window.html2canvas(innerEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      })
         .then(function(canvas) {
           innerEl.style.transform = prevTransform;
           innerEl.style.width = prevWidth;
+
+          if (!canvas || canvas.width < 10 || canvas.height < 10) {
+            _toastPDF('PDF तयार करता आलं नाही (रिकामं content). कृपया पुन्हा प्रयत्न करा किंवा App ला कळवा.', '#b91c1c');
+            done();
+            return;
+          }
 
           var jsPDF = window.jspdf.jsPDF;
           var pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
