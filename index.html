@@ -189,24 +189,36 @@
       });
   }
 
-  // Override setItem: keep normal behavior, add cloud push for members keys
-  localStorage.setItem = function(key, value){
-    _origSetItem(key, value);
-    if (key === '__ft_override_probe__' && window.__ftDebugLog) window.__ftDebugLog('OVERRIDE PROBE: setItem override IS working','ok');
+  // NOTE: We do NOT rely on overriding localStorage.setItem, since this can silently
+  // fail to take effect in some iOS Safari / WKWebView versions with no error thrown.
+  // Instead we POLL localStorage periodically and diff against last-known values.
+  var _pollKnown = {}; // orgId -> last known JSON string for members
+
+  function _pollScan(){
     try{
-      var m = _memberKeyRe.exec(key);
-      if (m) {
+      for (var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        var m = k && _memberKeyRe.exec(k);
+        if (!m) continue;
         var orgId = m[1];
-        if(window.__ftDebugLog)window.__ftDebugLog('setItem intercepted for key: '+key,'info');
-        _waitForAuth(function(){
-          _pushMembersToCloud(orgId, value);
-          _subscribeOrg(orgId); // ensure we're listening for remote changes too
-        });
+        var val = _origGetItem(k);
+        if (_pollKnown[orgId] === val) continue;
+        _pollKnown[orgId] = val;
+        if(window.__ftDebugLog)window.__ftDebugLog('Poll detected change for key: '+k,'info');
+        (function(_oid, _v){
+          _waitForAuth(function(){
+            _pushMembersToCloud(_oid, _v);
+            _subscribeOrg(_oid);
+          });
+        })(orgId, val);
       }
-    }catch(shimErr){
-      if(window.__ftDebugLog)window.__ftDebugLog('setItem override THREW: '+(shimErr&&shimErr.message||shimErr),'error');
+    }catch(pollErr){
+      if(window.__ftDebugLog)window.__ftDebugLog('Poll scan FAILED: '+(pollErr&&pollErr.message||pollErr),'error');
     }
-  };
+  }
+  if(window.__ftDebugLog)window.__ftDebugLog('Poll-based sync active (checks every 2s)','info');
+  setInterval(_pollScan, 2000);
+  _pollScan();
 
   // On load, if an active org already exists, subscribe immediately
   _waitForAuth(function(){
@@ -218,14 +230,6 @@
       }
     }catch(e){ console.error('[ft-sync] init subscribe scan failed:', e); if(window.__ftDebugLog)window.__ftDebugLog('Init subscribe scan FAILED: '+(e&&e.message||e),'error'); }
     if(window.__ftDebugLog)window.__ftDebugLog('Members sync shim ready','ok');
-    setTimeout(function(){
-      try{
-        localStorage.setItem('__ft_override_probe__','1');
-        localStorage.removeItem('__ft_override_probe__');
-      }catch(e){
-        if(window.__ftDebugLog)window.__ftDebugLog('Probe write FAILED: '+(e&&e.message||e),'error');
-      }
-    }, 500);
   });
 })();
 </script>
