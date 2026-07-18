@@ -681,6 +681,37 @@
   };
 })();
 </script>
+<script id="ft-subscription-hooks-js">
+(function(){
+  function _getActiveOrgId(){
+    try{ return JSON.parse(localStorage.getItem('ft_global_activeOrgId')||'null') || 'org_default'; }
+    catch(e){ return 'org_default'; }
+  }
+
+  window.__ftGetSubscription = function(){
+    try{
+      var orgId = _getActiveOrgId();
+      var s = JSON.parse(localStorage.getItem('ft_subscription_'+orgId)||'null');
+      if (s && s.plan) {
+        var today = new Date().toISOString().slice(0,10);
+        var isExpired = s.plan === 'PREMIUM' && s.expiryDate && today > s.expiryDate;
+        return {
+          plan: s.plan,
+          status: isExpired ? 'EXPIRED' : 'ACTIVE',
+          expiryDate: s.expiryDate || '',
+          maxMembers: (s.plan === 'PREMIUM' && !isExpired) ? Infinity : 20
+        };
+      }
+    }catch(e){}
+    return {plan:'FREE', status:'ACTIVE', expiryDate:'', maxMembers:20};
+  };
+
+  window.__ftIsPremium = function(){
+    var s = window.__ftGetSubscription();
+    return s.plan === 'PREMIUM' && s.status !== 'EXPIRED';
+  };
+})();
+</script>
 <script id="ft-owner-tools-js">
 (function(){
   var OWNER_MOBILE = '8591895492';
