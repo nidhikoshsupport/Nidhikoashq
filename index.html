@@ -283,7 +283,6 @@
 
   function _applyRemoteOrgData(orgId, data){
     if (!data) return;
-    if(window.__ftDebugLog)window.__ftDebugLog('Snapshot fields for '+orgId+': ['+Object.keys(data).join(', ')+']','info');
 
     // Subscription bridge: orgs/{orgId}.subscription -> ft_subscription_{orgId}
     if ('subscription' in data) {
@@ -291,6 +290,7 @@
         var subJsonStr = JSON.stringify(data.subscription);
         var subKey = 'ft_subscription_' + orgId;
         var subLocalVal = _origGetItem(subKey);
+        if(window.__ftDebugLog)window.__ftDebugLog('Sub check ('+orgId+') remote='+subJsonStr+' | local='+subLocalVal+' | lastPushed='+_lastSubPushed[orgId],'info');
         if (subJsonStr === subLocalVal) {
           _lastSubPulled[orgId] = subJsonStr;
         } else if (subJsonStr !== _lastSubPushed[orgId]) {
