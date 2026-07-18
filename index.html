@@ -298,17 +298,9 @@
           _origSetItem(subKey, subJsonStr);
           if(window.__ftDebugLog)window.__ftDebugLog('Remote subscription update applied (org '+orgId+')','ok');
           window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: 'subscription' } }));
-          // The Subscription screen only reads localStorage once at mount -- and on a
-          // fresh page load, it typically renders (using whatever was already in
-          // localStorage) BEFORE this cloud pull has a chance to complete, so it can
-          // show stale data even though localStorage is now correct. Always reload
-          // once after a genuine subscription change so the screen reflects it. This
-          // does not loop: once local matches remote, this branch won't fire again.
-          if (!_subReloadDone[orgId]) {
-            _subReloadDone[orgId] = true;
-            _showSyncToast('☁️ Subscription updated. Refreshing...');
-            setTimeout(function(){ location.reload(); }, 1200);
-          }
+          // window.__ftGetSubscription() re-reads localStorage fresh on every call
+          // (i.e. every time the Subscription screen renders), so no reload is
+          // needed here -- the screen will show correct data next time it's viewed.
         }
       }catch(subErr){
         if(window.__ftDebugLog)window.__ftDebugLog('Subscription apply THREW: '+(subErr&&subErr.message||subErr),'error');
@@ -412,7 +404,6 @@
   var _subKeyRe = /^ft_subscription_(.+)$/;
   var _lastSubPushed = {};   // orgId -> JSON string
   var _lastSubPulled = {};   // orgId -> JSON string
-  var _subReloadDone = {};   // orgId -> true once we've auto-reloaded for a subscription change this session
 
   function _pushSubscription(orgId, jsonStr){
     try{
