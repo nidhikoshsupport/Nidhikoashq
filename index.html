@@ -261,6 +261,9 @@
   }
 
   var _deletedOrgs = {}; // orgId -> true, once we detect it's gone from Firestore
+  var _orgPullReady = {}; // orgId -> true, once we've received the FIRST snapshot for it
+                          // (prevents pushing possibly-stale local data before we've
+                          // pulled down whatever the cloud already has)
 
   function _clearLocalOrg(orgId){
     try{
@@ -297,13 +300,15 @@
             var subJsonStr = JSON.stringify(data.subscription);
             var subKey = 'ft_subscription_' + orgId;
             var subLocalVal = _origGetItem(subKey);
-            if (subJsonStr !== subLocalVal && subJsonStr !== _lastSubPushed[orgId]) {
+            if (subJsonStr === subLocalVal) {
+              _lastSubPulled[orgId] = subJsonStr;
+            } else if (subJsonStr !== _lastSubPushed[orgId]) {
               _lastSubPushed[orgId] = subJsonStr;
               _lastSubPulled[orgId] = subJsonStr;
               _origSetItem(subKey, subJsonStr);
               if(window.__ftDebugLog)window.__ftDebugLog('Remote subscription update applied (org '+orgId+')','ok');
               window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: 'subscription' } }));
-              _showSyncToast('☁️ Subscription cloud वरून update झालं');
+              if (_orgPullReady[orgId]) _showSyncToast('☁️ Subscription cloud वरून update झालं');
             }
           }catch(subErr){
             if(window.__ftDebugLog)window.__ftDebugLog('Subscription apply THREW: '+(subErr&&subErr.message||subErr),'error');
@@ -316,7 +321,7 @@
           var key = 'ft_org_' + orgId + '_' + suffix;
           var pk = orgId + ':' + suffix;
           var localVal = _origGetItem(key);
-          if (jsonStr === localVal) return;
+          if (jsonStr === localVal) { _pollKnown[pk] = jsonStr; return; }
           if (jsonStr === _lastPushed[pk]) { _lastPushed[pk] = jsonStr; return; }
           // Genuine remote change
           _lastPushed[pk] = jsonStr;
@@ -324,8 +329,12 @@
           _origSetItem(key, jsonStr);
           if(window.__ftDebugLog)window.__ftDebugLog('Remote update applied: '+suffix+' (org '+orgId+')','ok');
           window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: suffix } }));
-          _showSyncToast('☁️ ' + suffix + ' cloud वरून update झालं');
+          if (_orgPullReady[orgId]) _showSyncToast('☁️ ' + suffix + ' cloud वरून update झालं');
         });
+        if (!_orgPullReady[orgId]) {
+          _orgPullReady[orgId] = true;
+          if(window.__ftDebugLog)window.__ftDebugLog('Initial cloud pull complete for org '+orgId+' -- pushes now enabled','info');
+        }
       }, function(err){
         if(window.__ftDebugLog)window.__ftDebugLog('onSnapshot ERROR (org '+orgId+'): '+(err&&err.message||err),'error');
       });
@@ -345,6 +354,13 @@
         var pk = orgId + ':' + suffix;
         var val = _origGetItem(k);
         if (_pollKnown[pk] === val) continue;
+        if (!_orgPullReady[orgId]) {
+          // Haven't pulled the current cloud state for this org yet -- don't push
+          // possibly-stale local data over a newer remote change. _subscribeOrg
+          // below will apply the real cloud state first; pushes resume after that.
+          _waitForAuth(function(_oid){ return function(){ _subscribeOrg(_oid); }; }(orgId));
+          continue;
+        }
         _pollKnown[pk] = val;
         (function(_oid, _suf, _v){
           _waitForAuth(function(){
@@ -387,6 +403,10 @@
         if (!m) continue;
         var orgId = m[1];
         if (_deletedOrgs[orgId]) continue; // don't resurrect a remotely-deleted org
+        if (!_orgPullReady[orgId]) {
+          _waitForAuth(function(_oid){ return function(){ _subscribeOrg(_oid); }; }(orgId));
+          continue;
+        }
         var val = _origGetItem(k);
         if (_lastSubPulled[orgId] === val) continue; // this is just our own remote-pull echoing back
         if (_lastSubPushed[orgId] === val) continue; // already pushed, no change
