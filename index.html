@@ -260,11 +260,34 @@
     }catch(e){}
   }
 
+  var _deletedOrgs = {}; // orgId -> true, once we detect it's gone from Firestore
+
+  function _clearLocalOrg(orgId){
+    try{
+      _SUFFIXES.concat(['subscription']).forEach(function(suffix){
+        var key = (suffix === 'subscription') ? ('ft_subscription_' + orgId) : ('ft_org_' + orgId + '_' + suffix);
+        localStorage.removeItem(key);
+      });
+      var orgsMeta = JSON.parse(localStorage.getItem('ft_global_orgs') || '[]');
+      var filtered = orgsMeta.filter(function(o){ return o.id !== orgId; });
+      localStorage.setItem('ft_global_orgs', JSON.stringify(filtered));
+      if(window.__ftDebugLog)window.__ftDebugLog('Org '+orgId+' removed remotely -- cleared local copy','info');
+      _showSyncToast('⚠️ This organisation was removed. Local copy cleared.');
+    }catch(e){
+      if(window.__ftDebugLog)window.__ftDebugLog('_clearLocalOrg THREW: '+(e&&e.message||e),'error');
+    }
+  }
+
   function _subscribeOrg(orgId){
-    if (!window.__db || _unsubMap[orgId]) return;
+    if (!window.__db || _unsubMap[orgId] || _deletedOrgs[orgId]) return;
     _unsubMap[orgId] = window.__db.collection('orgs').doc(orgId)
       .onSnapshot(function(doc){
-        if (!doc.exists) return;
+        if (!doc.exists) {
+          _deletedOrgs[orgId] = true;
+          if (_unsubMap[orgId]) { _unsubMap[orgId](); delete _unsubMap[orgId]; }
+          _clearLocalOrg(orgId);
+          return;
+        }
         var data = doc.data();
         if (!data) return;
 
@@ -318,6 +341,7 @@
         var m = k && _keyRe.exec(k);
         if (!m) continue;
         var orgId = m[1], suffix = m[2];
+        if (_deletedOrgs[orgId]) continue; // don't resurrect a remotely-deleted org
         var pk = orgId + ':' + suffix;
         var val = _origGetItem(k);
         if (_pollKnown[pk] === val) continue;
@@ -362,6 +386,7 @@
         var m = k && _subKeyRe.exec(k);
         if (!m) continue;
         var orgId = m[1];
+        if (_deletedOrgs[orgId]) continue; // don't resurrect a remotely-deleted org
         var val = _origGetItem(k);
         if (_lastSubPulled[orgId] === val) continue; // this is just our own remote-pull echoing back
         if (_lastSubPushed[orgId] === val) continue; // already pushed, no change
