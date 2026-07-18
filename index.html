@@ -281,6 +281,59 @@
     }
   }
 
+  function _applyRemoteOrgData(orgId, data){
+    if (!data) return;
+
+    // Subscription bridge: orgs/{orgId}.subscription -> ft_subscription_{orgId}
+    if ('subscription' in data) {
+      try{
+        var subJsonStr = JSON.stringify(data.subscription);
+        var subKey = 'ft_subscription_' + orgId;
+        var subLocalVal = _origGetItem(subKey);
+        if (subJsonStr === subLocalVal) {
+          _lastSubPulled[orgId] = subJsonStr;
+        } else if (subJsonStr !== _lastSubPushed[orgId]) {
+          var wasAlreadyLive = _orgPullReady[orgId]; // false only on this org's very first pull (page just loaded)
+          _lastSubPushed[orgId] = subJsonStr;
+          _lastSubPulled[orgId] = subJsonStr;
+          _origSetItem(subKey, subJsonStr);
+          if(window.__ftDebugLog)window.__ftDebugLog('Remote subscription update applied (org '+orgId+')','ok');
+          window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: 'subscription' } }));
+          if (wasAlreadyLive) {
+            // App was already open and in use when this changed (not just-loaded) --
+            // the Subscription screen only reads localStorage once at mount, so it
+            // won't pick this up on its own. Reload so it shows correctly right away.
+            _showSyncToast('☁️ Subscription updated. Refreshing...');
+            setTimeout(function(){ location.reload(); }, 1200);
+          }
+        }
+      }catch(subErr){
+        if(window.__ftDebugLog)window.__ftDebugLog('Subscription apply THREW: '+(subErr&&subErr.message||subErr),'error');
+      }
+    }
+
+    _SUFFIXES.forEach(function(suffix){
+      if (!(suffix in data)) return;
+      var jsonStr = JSON.stringify(data[suffix]);
+      var key = 'ft_org_' + orgId + '_' + suffix;
+      var pk = orgId + ':' + suffix;
+      var localVal = _origGetItem(key);
+      if (jsonStr === localVal) { _pollKnown[pk] = jsonStr; return; }
+      if (jsonStr === _lastPushed[pk]) { _lastPushed[pk] = jsonStr; return; }
+      // Genuine remote change
+      _lastPushed[pk] = jsonStr;
+      _pollKnown[pk] = jsonStr;
+      _origSetItem(key, jsonStr);
+      if(window.__ftDebugLog)window.__ftDebugLog('Remote update applied: '+suffix+' (org '+orgId+')','ok');
+      window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: suffix } }));
+      if (_orgPullReady[orgId]) _showSyncToast('☁️ ' + suffix + ' cloud वरून update झालं');
+    });
+    if (!_orgPullReady[orgId]) {
+      _orgPullReady[orgId] = true;
+      if(window.__ftDebugLog)window.__ftDebugLog('Initial cloud pull complete for org '+orgId+' -- pushes now enabled','info');
+    }
+  }
+
   function _subscribeOrg(orgId){
     if (!window.__db || _unsubMap[orgId] || _deletedOrgs[orgId]) return;
     _unsubMap[orgId] = window.__db.collection('orgs').doc(orgId)
@@ -291,60 +344,32 @@
           _clearLocalOrg(orgId);
           return;
         }
-        var data = doc.data();
-        if (!data) return;
-
-        // Subscription bridge: orgs/{orgId}.subscription -> ft_subscription_{orgId}
-        if ('subscription' in data) {
-          try{
-            var subJsonStr = JSON.stringify(data.subscription);
-            var subKey = 'ft_subscription_' + orgId;
-            var subLocalVal = _origGetItem(subKey);
-            if (subJsonStr === subLocalVal) {
-              _lastSubPulled[orgId] = subJsonStr;
-            } else if (subJsonStr !== _lastSubPushed[orgId]) {
-              var wasAlreadyLive = _orgPullReady[orgId]; // false only on this org's very first pull (page just loaded)
-              _lastSubPushed[orgId] = subJsonStr;
-              _lastSubPulled[orgId] = subJsonStr;
-              _origSetItem(subKey, subJsonStr);
-              if(window.__ftDebugLog)window.__ftDebugLog('Remote subscription update applied (org '+orgId+')','ok');
-              window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: 'subscription' } }));
-              if (wasAlreadyLive) {
-                // App was already open and in use when this changed (not just-loaded) --
-                // the Subscription screen only reads localStorage once at mount, so it
-                // won't pick this up on its own. Reload so it shows correctly right away.
-                _showSyncToast('☁️ Subscription updated. Refreshing...');
-                setTimeout(function(){ location.reload(); }, 1200);
-              }
-            }
-          }catch(subErr){
-            if(window.__ftDebugLog)window.__ftDebugLog('Subscription apply THREW: '+(subErr&&subErr.message||subErr),'error');
-          }
-        }
-
-        _SUFFIXES.forEach(function(suffix){
-          if (!(suffix in data)) return;
-          var jsonStr = JSON.stringify(data[suffix]);
-          var key = 'ft_org_' + orgId + '_' + suffix;
-          var pk = orgId + ':' + suffix;
-          var localVal = _origGetItem(key);
-          if (jsonStr === localVal) { _pollKnown[pk] = jsonStr; return; }
-          if (jsonStr === _lastPushed[pk]) { _lastPushed[pk] = jsonStr; return; }
-          // Genuine remote change
-          _lastPushed[pk] = jsonStr;
-          _pollKnown[pk] = jsonStr;
-          _origSetItem(key, jsonStr);
-          if(window.__ftDebugLog)window.__ftDebugLog('Remote update applied: '+suffix+' (org '+orgId+')','ok');
-          window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: suffix } }));
-          if (_orgPullReady[orgId]) _showSyncToast('☁️ ' + suffix + ' cloud वरून update झालं');
-        });
-        if (!_orgPullReady[orgId]) {
-          _orgPullReady[orgId] = true;
-          if(window.__ftDebugLog)window.__ftDebugLog('Initial cloud pull complete for org '+orgId+' -- pushes now enabled','info');
-        }
+        _applyRemoteOrgData(orgId, doc.data());
       }, function(err){
         if(window.__ftDebugLog)window.__ftDebugLog('onSnapshot ERROR (org '+orgId+'): '+(err&&err.message||err),'error');
       });
+  }
+
+  // Backup path: some networks/devices have flaky realtime-listener channels
+  // (websocket/long-poll) that silently stop delivering updates. Every few
+  // seconds, force a direct server read for each org we're tracking, bypassing
+  // any local cache, so genuine cloud changes are never missed.
+  function _forceServerRefresh(){
+    if (!window.__db) return;
+    Object.keys(_unsubMap).forEach(function(orgId){
+      if (_deletedOrgs[orgId]) return;
+      window.__db.collection('orgs').doc(orgId).get({ source: 'server' }).then(function(doc){
+        if (!doc.exists) {
+          _deletedOrgs[orgId] = true;
+          if (_unsubMap[orgId]) { _unsubMap[orgId](); delete _unsubMap[orgId]; }
+          _clearLocalOrg(orgId);
+          return;
+        }
+        _applyRemoteOrgData(orgId, doc.data());
+      }).catch(function(e){
+        if(window.__ftDebugLog)window.__ftDebugLog('Force server refresh FAILED (org '+orgId+'): '+(e&&e.message||e),'error');
+      });
+    });
   }
 
   // We do NOT rely on overriding localStorage.setItem, since that silently failed to
@@ -491,6 +516,7 @@
 
   if(window.__ftDebugLog)window.__ftDebugLog('Poll-based org sync active (members+banks+ledger+permissions+customRoles+guests+categories+subscription, checks every 2s)','info');
   setInterval(function(){ _pollScan(); _pollGlobalScan(); _pollSubscriptionScan(); }, 2000);
+  setInterval(_forceServerRefresh, 4000);
   _pollScan();
   _pollGlobalScan();
   _pollSubscriptionScan();
