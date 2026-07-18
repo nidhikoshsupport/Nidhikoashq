@@ -267,6 +267,26 @@
         if (!doc.exists) return;
         var data = doc.data();
         if (!data) return;
+
+        // Subscription bridge: orgs/{orgId}.subscription -> ft_subscription_{orgId}
+        if ('subscription' in data) {
+          try{
+            var subJsonStr = JSON.stringify(data.subscription);
+            var subKey = 'ft_subscription_' + orgId;
+            var subLocalVal = _origGetItem(subKey);
+            if (subJsonStr !== subLocalVal && subJsonStr !== _lastSubPushed[orgId]) {
+              _lastSubPushed[orgId] = subJsonStr;
+              _lastSubPulled[orgId] = subJsonStr;
+              _origSetItem(subKey, subJsonStr);
+              if(window.__ftDebugLog)window.__ftDebugLog('Remote subscription update applied (org '+orgId+')','ok');
+              window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: 'subscription' } }));
+              _showSyncToast('☁️ Subscription cloud वरून update झालं');
+            }
+          }catch(subErr){
+            if(window.__ftDebugLog)window.__ftDebugLog('Subscription apply THREW: '+(subErr&&subErr.message||subErr),'error');
+          }
+        }
+
         _SUFFIXES.forEach(function(suffix){
           if (!(suffix in data)) return;
           var jsonStr = JSON.stringify(data[suffix]);
@@ -313,6 +333,45 @@
       if(window.__ftDebugLog)window.__ftDebugLog('Poll scan FAILED: '+(pollErr&&pollErr.message||pollErr),'error');
     }
   }
+  // ---- ft_subscription_{orgId} <-> orgs/{orgId}.subscription bridge ----
+  var _subKeyRe = /^ft_subscription_(.+)$/;
+  var _lastSubPushed = {};   // orgId -> JSON string
+  var _lastSubPulled = {};   // orgId -> JSON string
+
+  function _pushSubscription(orgId, jsonStr){
+    try{
+      if (!window.__db) return;
+      if (_lastSubPushed[orgId] === jsonStr) return;
+      _lastSubPushed[orgId] = jsonStr;
+      var parsed;
+      try { parsed = JSON.parse(jsonStr); } catch(e){ return; }
+      window.__db.collection('orgs').doc(orgId).set({ subscription: parsed }, { merge: true }).then(function(){
+        if(window.__ftDebugLog)window.__ftDebugLog('Pushed subscription to cloud (org '+orgId+')','ok');
+      }).catch(function(e){
+        if(window.__ftDebugLog)window.__ftDebugLog('subscription push FAILED ('+orgId+'): '+(e&&e.message||e),'error');
+      });
+    }catch(e){
+      if(window.__ftDebugLog)window.__ftDebugLog('_pushSubscription THREW: '+(e&&e.message||e),'error');
+    }
+  }
+
+  function _pollSubscriptionScan(){
+    try{
+      for (var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        var m = k && _subKeyRe.exec(k);
+        if (!m) continue;
+        var orgId = m[1];
+        var val = _origGetItem(k);
+        if (_lastSubPulled[orgId] === val) continue; // this is just our own remote-pull echoing back
+        if (_lastSubPushed[orgId] === val) continue; // already pushed, no change
+        _waitForAuth(function(_oid, _v){ return function(){ _pushSubscription(_oid, _v); }; }(orgId, val));
+      }
+    }catch(e){
+      if(window.__ftDebugLog)window.__ftDebugLog('Subscription poll scan FAILED: '+(e&&e.message||e),'error');
+    }
+  }
+
   // ---- Global keys sync: ft_appUsers (mobile+PIN directory) and ft_global_orgs (org metadata) ----
   var _lastUsersJSON = null, _lastOrgsMetaJSON = null;
 
@@ -378,10 +437,11 @@
     }
   }
 
-  if(window.__ftDebugLog)window.__ftDebugLog('Poll-based org sync active (members+banks+ledger+permissions+customRoles+guests+categories, checks every 2s)','info');
-  setInterval(function(){ _pollScan(); _pollGlobalScan(); }, 2000);
+  if(window.__ftDebugLog)window.__ftDebugLog('Poll-based org sync active (members+banks+ledger+permissions+customRoles+guests+categories+subscription, checks every 2s)','info');
+  setInterval(function(){ _pollScan(); _pollGlobalScan(); _pollSubscriptionScan(); }, 2000);
   _pollScan();
   _pollGlobalScan();
+  _pollSubscriptionScan();
 
   // On load, subscribe immediately for any org already present locally
   _waitForAuth(function(){
