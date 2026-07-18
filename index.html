@@ -303,12 +303,19 @@
             if (subJsonStr === subLocalVal) {
               _lastSubPulled[orgId] = subJsonStr;
             } else if (subJsonStr !== _lastSubPushed[orgId]) {
+              var wasAlreadyLive = _orgPullReady[orgId]; // false only on this org's very first pull (page just loaded)
               _lastSubPushed[orgId] = subJsonStr;
               _lastSubPulled[orgId] = subJsonStr;
               _origSetItem(subKey, subJsonStr);
               if(window.__ftDebugLog)window.__ftDebugLog('Remote subscription update applied (org '+orgId+')','ok');
               window.dispatchEvent(new CustomEvent('ft-cloud-org-updated', { detail: { orgId: orgId, suffix: 'subscription' } }));
-              if (_orgPullReady[orgId]) _showSyncToast('☁️ Subscription cloud वरून update झालं');
+              if (wasAlreadyLive) {
+                // App was already open and in use when this changed (not just-loaded) --
+                // the Subscription screen only reads localStorage once at mount, so it
+                // won't pick this up on its own. Reload so it shows correctly right away.
+                _showSyncToast('☁️ Subscription updated. Refreshing...');
+                setTimeout(function(){ location.reload(); }, 1200);
+              }
             }
           }catch(subErr){
             if(window.__ftDebugLog)window.__ftDebugLog('Subscription apply THREW: '+(subErr&&subErr.message||subErr),'error');
