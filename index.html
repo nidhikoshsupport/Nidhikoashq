@@ -427,7 +427,26 @@
         var orgIds = joinedOrgs.map(function(j){ return j.orgId; }).filter(Boolean);
 
         function _proceedWithOrgIds(finalOrgIds){
-          if (!finalOrgIds.length) { cb(false, 'No organisations linked to this account.'); return; }
+          if (!finalOrgIds.length) {
+            // No organisations found for this mobile (owner or a regular user whose
+            // org link didn't sync/match). Still let the account log in locally --
+            // the app's normal "no organisation yet" screen (same as a brand new
+            // signup) will show, rather than hard-blocking the login entirely.
+            try{
+              var allUsers2 = JSON.parse(localStorage.getItem('ft_appUsers') || '[]');
+              var uIdx2 = allUsers2.findIndex(function(x){ return x.id === u.id; });
+              if (uIdx2 >= 0) allUsers2[uIdx2] = u; else allUsers2.push(u);
+              localStorage.setItem('ft_appUsers', JSON.stringify(allUsers2));
+              localStorage.setItem('ft_appUser', JSON.stringify(u));
+              if(window.__ftDebugLog)window.__ftDebugLog('Login with zero orgs allowed, reloading...','ok');
+              cb(true);
+              setTimeout(function(){ location.reload(); }, 300);
+            }catch(e){
+              if(window.__ftDebugLog)window.__ftDebugLog('Zero-org login apply THREW: '+(e&&e.message||e),'error');
+              cb(false, 'Something went wrong. Try again.');
+            }
+            return;
+          }
           var fetches = finalOrgIds.map(function(orgId){
             return window.__db.collection('orgs').doc(orgId).get().then(function(orgDoc){
               return { orgId: orgId, data: orgDoc.exists ? orgDoc.data() : null };
