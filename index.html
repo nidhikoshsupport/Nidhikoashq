@@ -855,43 +855,55 @@
     renderContent();
   }
 
-  // ---------------- Manage plan modal ----------------
+  // ---------------- Manage plan: full-screen page ----------------
   function _showManagePlan(org, onSaved){
-    var ov = _el('div', 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2147483200;display:flex;align-items:flex-end;justify-content:center;');
-    var panel = _el('div',
-      'width:100%;max-width:420px;background:' + C.card + ';border-top:1px solid ' + C.border + ';border-radius:18px 18px 0 0;padding:20px;box-sizing:border-box;'
+    var ov = _overlay();
+    var body = _el('div', 'max-width:520px;margin:0 auto;padding:16px 14px 60px;');
+
+    var header = _el('div', 'display:flex;align-items:center;gap:10px;margin-bottom:20px;');
+    var backBtn = _el('div',
+      'width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4f46e5,#7c3aed);' +
+      'display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;',
+      '‹'
     );
+    backBtn.onclick = function(){ ov.remove(); };
+    header.appendChild(backBtn);
+    header.appendChild(_el('div', 'min-width:0;',
+      '<div style="color:' + C.text + ';font-weight:900;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + org.name + '</div>' +
+      '<div style="color:' + C.sub + ';font-size:12px;font-weight:700;">' + org.code + ' · Manage subscription</div>'
+    ));
+    body.appendChild(header);
+
+    var card = _el('div', 'border-radius:18px;background:' + C.card + ';border:1px solid ' + C.border + ';padding:20px;');
+    body.appendChild(card);
+    ov.appendChild(body);
 
     var plan = org.plan, expiry = org.expiry || '';
 
-    function renderPanel(){
-      panel.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
-        '<div><div style="color:' + C.text + ';font-weight:900;font-size:15px;">' + org.name + '</div>' +
-        '<div style="color:' + C.sub + ';font-size:11px;">' + org.code + '</div></div>' +
-        '<div id="ft-mp-close" style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:' + C.text + ';cursor:pointer;">✕</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
-        '<div id="ft-mp-free" style="flex:1;text-align:center;padding:10px;border-radius:12px;font-size:12.5px;font-weight:900;cursor:pointer;' + (plan==='FREE'?'background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;':'background:rgba(255,255,255,0.06);color:'+C.sub+';') + '">FREE</div>' +
-        '<div id="ft-mp-prem" style="flex:1;text-align:center;padding:10px;border-radius:12px;font-size:12.5px;font-weight:900;cursor:pointer;' + (plan==='PREMIUM'?'background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;':'background:rgba(255,255,255,0.06);color:'+C.sub+';') + '">👑 PREMIUM</div>' +
+    function renderCard(){
+      card.innerHTML =
+        '<div style="color:' + C.sub + ';font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;">Plan</div>' +
+        '<div style="display:flex;gap:10px;margin-bottom:22px;">' +
+        '<div id="ft-mp-free" style="flex:1;text-align:center;padding:16px 0;border-radius:14px;font-size:14px;font-weight:900;cursor:pointer;' + (plan==='FREE'?'background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;':'background:rgba(255,255,255,0.06);color:'+C.sub+';') + '">FREE</div>' +
+        '<div id="ft-mp-prem" style="flex:1;text-align:center;padding:16px 0;border-radius:14px;font-size:14px;font-weight:900;cursor:pointer;' + (plan==='PREMIUM'?'background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;':'background:rgba(255,255,255,0.06);color:'+C.sub+';') + '">👑 PREMIUM</div>' +
         '</div>' +
         (plan === 'PREMIUM' ?
-          '<div style="color:' + C.sub + ';font-size:10.5px;font-weight:800;text-transform:uppercase;margin-bottom:6px;">Expiry date</div>' +
-          '<input id="ft-mp-expiry" type="date" value="' + expiry + '" style="width:100%;box-sizing:border-box;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid ' + C.border + ';padding:10px 12px;color:' + C.text + ';font-size:13px;margin-bottom:12px;" />' +
-          '<div style="display:flex;gap:8px;margin-bottom:16px;">' +
-          '<div class="ft-mp-ext" data-d="30" style="flex:1;text-align:center;padding:9px;border-radius:10px;background:rgba(255,255,255,0.06);color:' + C.sub + ';font-size:11.5px;font-weight:800;cursor:pointer;">+30d</div>' +
-          '<div class="ft-mp-ext" data-d="90" style="flex:1;text-align:center;padding:9px;border-radius:10px;background:rgba(255,255,255,0.06);color:' + C.sub + ';font-size:11.5px;font-weight:800;cursor:pointer;">+90d</div>' +
-          '<div class="ft-mp-ext" data-d="365" style="flex:1;text-align:center;padding:9px;border-radius:10px;background:rgba(255,255,255,0.06);color:' + C.sub + ';font-size:11.5px;font-weight:800;cursor:pointer;">+365d</div>' +
+          '<div style="color:' + C.sub + ';font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">Expiry date</div>' +
+          '<input id="ft-mp-expiry" type="date" value="' + expiry + '" style="width:100%;box-sizing:border-box;border-radius:14px;background:rgba(255,255,255,0.06);border:1px solid ' + C.border + ';padding:16px;color:' + C.text + ';font-size:15px;margin-bottom:18px;" />' +
+          '<div style="color:' + C.sub + ';font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">Quick extend</div>' +
+          '<div style="display:flex;gap:10px;margin-bottom:26px;">' +
+          '<div class="ft-mp-ext" data-d="30" style="flex:1;text-align:center;padding:14px 0;border-radius:12px;background:rgba(255,255,255,0.06);color:' + C.sub + ';font-size:13px;font-weight:800;cursor:pointer;">+30 days</div>' +
+          '<div class="ft-mp-ext" data-d="90" style="flex:1;text-align:center;padding:14px 0;border-radius:12px;background:rgba(255,255,255,0.06);color:' + C.sub + ';font-size:13px;font-weight:800;cursor:pointer;">+90 days</div>' +
+          '<div class="ft-mp-ext" data-d="365" style="flex:1;text-align:center;padding:14px 0;border-radius:12px;background:rgba(255,255,255,0.06);color:' + C.sub + ';font-size:13px;font-weight:800;cursor:pointer;">+365 days</div>' +
           '</div>'
-        : '<div style="height:4px;"></div>') +
-        '<div id="ft-mp-save" style="text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-weight:900;font-size:13px;cursor:pointer;">Save changes</div>';
+        : '<div style="height:6px;"></div>') +
+        '<div id="ft-mp-save" style="text-align:center;padding:16px;border-radius:14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-weight:900;font-size:14px;cursor:pointer;">✓ Save changes</div>';
 
-      panel.querySelector('#ft-mp-close').onclick = function(){ ov.remove(); };
-      panel.querySelector('#ft-mp-free').onclick = function(){ plan = 'FREE'; renderPanel(); };
-      panel.querySelector('#ft-mp-prem').onclick = function(){ plan = 'PREMIUM'; if(!expiry){ var d=new Date(); d.setDate(d.getDate()+365); expiry=d.toISOString().slice(0,10); } renderPanel(); };
-      var expiryInput = panel.querySelector('#ft-mp-expiry');
+      card.querySelector('#ft-mp-free').onclick = function(){ plan = 'FREE'; renderCard(); };
+      card.querySelector('#ft-mp-prem').onclick = function(){ plan = 'PREMIUM'; if(!expiry){ var d=new Date(); d.setDate(d.getDate()+365); expiry=d.toISOString().slice(0,10); } renderCard(); };
+      var expiryInput = card.querySelector('#ft-mp-expiry');
       if (expiryInput) expiryInput.oninput = function(){ expiry = expiryInput.value; };
-      var extBtns = panel.querySelectorAll('.ft-mp-ext');
+      var extBtns = card.querySelectorAll('.ft-mp-ext');
       extBtns.forEach(function(b){
         b.onclick = function(){
           var days = parseInt(b.getAttribute('data-d'), 10);
@@ -899,10 +911,10 @@
           base.setDate(base.getDate() + days);
           expiry = base.toISOString().slice(0,10);
           plan = 'PREMIUM';
-          renderPanel();
+          renderCard();
         };
       });
-      panel.querySelector('#ft-mp-save').onclick = function(){
+      card.querySelector('#ft-mp-save').onclick = function(){
         var payload = { subscription: { plan: plan, expiryDate: plan === 'PREMIUM' ? expiry : '' } };
         window.__db.collection('orgs').doc(org.id).set(payload, { merge: true }).then(function(){
           if(window.__ftDebugLog)window.__ftDebugLog('Owner: subscription updated for ' + org.id, 'ok');
@@ -914,9 +926,7 @@
       };
     }
 
-    renderPanel();
-    ov.appendChild(panel);
-    (document.body || document.documentElement).appendChild(ov);
+    renderCard();
   }
 
   // ---------------- Init ----------------
@@ -927,6 +937,78 @@
   }
   if (document.readyState !== 'loading') _init();
   else document.addEventListener('DOMContentLoaded', _init);
+})();
+</script>
+<script id="ft-subscription-modal-js">
+(function(){
+  var OWNER_WA_NUMBER = '918591895492'; // +91 8591895492, with country code for wa.me
+
+  function _getActiveOrg(){
+    try{
+      var orgId = localStorage.getItem('ft_global_activeOrgId');
+      if (orgId) { try { orgId = JSON.parse(orgId); } catch(e){} }
+      if (!orgId) orgId = localStorage.getItem('activeOrgId');
+      var orgs = JSON.parse(localStorage.getItem('ft_global_orgs') || '[]');
+      var org = orgs.find(function(o){ return o.id === orgId; });
+      return org || { name: 'My Organisation', code: orgId || '-' };
+    }catch(e){ return { name: 'My Organisation', code: '-' }; }
+  }
+
+  function _buildMessage(orgName, orgCode){
+    return "Hello \uD83D\uDE4F\n" +
+      "I have made the UPI payment of \u20B9999 for NidhiKosh Premium Subscription.\n\n" +
+      "Organisation: " + orgName + "\n" +
+      "Org Code: " + orgCode + "\n\n" +
+      "Please verify the payment screenshot and activate Premium for my organisation. " +
+      "Sending the screenshot separately in this same chat.";
+  }
+
+  window.__ftShowSubscriptionModal = function(memberCount){
+    var org = _getActiveOrg();
+    var msg = _buildMessage(org.name, org.code);
+
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:#060d1f;z-index:2147483100;overflow-y:auto;-webkit-overflow-scrolling:touch;font-family:Nunito,Arial,sans-serif;';
+
+    var body = document.createElement('div');
+    body.style.cssText = 'max-width:480px;margin:0 auto;padding:16px 16px 50px;';
+
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:20px;';
+    var backBtn = document.createElement('div');
+    backBtn.style.cssText = 'width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;';
+    backBtn.textContent = '\u2039';
+    backBtn.onclick = function(){ ov.remove(); };
+    header.appendChild(backBtn);
+    var headerText = document.createElement('div');
+    headerText.innerHTML = '<div style="color:#f1f5f9;font-weight:900;font-size:16px;">Upgrade to Premium</div>' +
+      '<div style="color:#64748b;font-size:12px;font-weight:700;">\u20B9999 / year</div>';
+    header.appendChild(headerText);
+    body.appendChild(header);
+
+    var card = document.createElement('div');
+    card.style.cssText = 'border-radius:18px;background:#0e1a30;border:1px solid #1e3a5f;padding:20px;';
+    card.innerHTML =
+      '<div style="color:#64748b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Organisation</div>' +
+      '<div style="color:#f1f5f9;font-size:15px;font-weight:900;margin-bottom:16px;">' + org.name + '</div>' +
+      '<div style="color:#64748b;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Org Code</div>' +
+      '<div style="background:rgba(255,255,255,0.06);border:1px solid #1e3a5f;border-radius:12px;padding:14px;color:#f1f5f9;font-size:18px;font-weight:900;letter-spacing:0.5px;margin-bottom:20px;text-align:center;">' + org.code + '</div>' +
+      '<div style="color:#94a3b8;font-size:12.5px;line-height:1.6;margin-bottom:18px;">' +
+      '1. Pay \u20B9999 via UPI to <b style="color:#f1f5f9;">8591895492@pnb</b><br>' +
+      '2. Tap the button below to send your Org Code to the App Owner on WhatsApp<br>' +
+      '3. Attach your payment screenshot in the same WhatsApp chat' +
+      '</div>' +
+      '<div id="ft-sub-wa-btn" style="text-align:center;padding:16px;border-radius:14px;background:linear-gradient(135deg,#25d366,#1ebe5d);color:#fff;font-weight:900;font-size:14px;cursor:pointer;">\uD83D\uDCF1 Send Org Code via WhatsApp</div>';
+
+    body.appendChild(card);
+    ov.appendChild(body);
+    (document.body || document.documentElement).appendChild(ov);
+
+    card.querySelector('#ft-sub-wa-btn').onclick = function(){
+      var waUrl = 'https://wa.me/' + OWNER_WA_NUMBER + '?text=' + encodeURIComponent(msg);
+      window.open(waUrl, '_blank');
+    };
+  };
 })();
 </script>
 </head><body><div id="root"></div><script>
