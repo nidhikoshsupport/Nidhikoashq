@@ -884,6 +884,7 @@
       '<input id="ft-ownlog-pass" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid ' + C.border + ';padding:12px 14px;color:' + C.text + ';font-size:14px;margin-bottom:8px;" />' +
       '<div id="ft-ownlog-err" style="color:#f87171;font-size:12px;font-weight:700;min-height:16px;margin-bottom:10px;"></div>' +
       '<div id="ft-ownlog-btn" style="text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-weight:900;font-size:14px;cursor:pointer;">Login</div>' +
+      '<div id="ft-ownlog-forgot" style="text-align:center;padding:12px 12px 4px;color:#fbbf24;font-weight:700;font-size:12.5px;cursor:pointer;">Forgot password?</div>' +
       '<div id="ft-ownlog-cancel" style="text-align:center;padding:12px;color:' + C.sub + ';font-weight:700;font-size:12.5px;cursor:pointer;">Cancel</div>';
 
     wrap.appendChild(card);
@@ -893,6 +894,25 @@
     var btnEl = card.querySelector('#ft-ownlog-btn');
 
     card.querySelector('#ft-ownlog-cancel').onclick = function(){ ov.remove(); };
+
+    card.querySelector('#ft-ownlog-forgot').onclick = function(){
+      var email = card.querySelector('#ft-ownlog-email').value.trim();
+      if (!email) { errEl.textContent = 'Enter your email first, then tap Forgot password.'; return; }
+      if (email.toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
+        errEl.textContent = 'This email is not authorised for Owner Tools.';
+        return;
+      }
+      errEl.style.color = '#fbbf24';
+      errEl.textContent = 'Sending reset link...';
+      firebase.auth().sendPasswordResetEmail(email).then(function(){
+        errEl.textContent = 'Reset link sent to ' + email + '. Check your inbox.';
+        if(window.__ftDebugLog)window.__ftDebugLog('Password reset email sent','ok');
+      }).catch(function(e){
+        errEl.style.color = '#f87171';
+        errEl.textContent = 'Could not send reset link: ' + (e && e.message || e);
+        if(window.__ftDebugLog)window.__ftDebugLog('Password reset FAILED: '+(e&&e.message||e),'error');
+      });
+    };
 
     btnEl.onclick = function(){
       var email = card.querySelector('#ft-ownlog-email').value.trim();
