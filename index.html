@@ -707,6 +707,49 @@
   };
 })();
 </script>
+<script id="ft-upgrade-overlay-js">
+(function(){
+  // Override the bundle's native alert()/confirm()-based upgrade prompt with our
+  // own on-page overlay. Native alert/confirm can be permanently "suppressed" by
+  // the browser after repeated triggers, silently breaking this warning forever
+  // (until page reload) -- a plain DOM overlay never has that problem.
+  function _showOverlay(msg){
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2147483400;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+
+    var card = document.createElement('div');
+    card.style.cssText = 'width:100%;max-width:380px;background:#0f1e38;border:1px solid #1e3a5f;border-radius:18px;padding:22px;font-family:Nunito,Arial,sans-serif;';
+    card.innerHTML =
+      '<div style="text-align:center;font-size:32px;margin-bottom:10px;">\u23f3</div>' +
+      '<div style="color:#f1f5f9;font-weight:900;font-size:16px;text-align:center;margin-bottom:10px;">Upgrade Required</div>' +
+      '<div style="color:#94a3b8;font-size:13.5px;line-height:1.6;text-align:center;margin-bottom:20px;">' + msg + '</div>' +
+      '<div id="ft-up-ok" style="text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-weight:900;font-size:14px;cursor:pointer;">OK, Got It</div>';
+
+    ov.appendChild(card);
+    (document.body || document.documentElement).appendChild(ov);
+    card.querySelector('#ft-up-ok').onclick = function(){ ov.remove(); };
+    ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  }
+
+  function _installOverride(){
+    window.__ftShowUpgradePrompt = function(reason){
+      var msg = reason || 'Upgrade to Premium to continue editing. Go to More (bottom right \u2699\ufe0f) \u2192 Subscription to upgrade.';
+      _showOverlay(msg);
+    };
+  }
+
+  // The main bundle assigns its own window.__ftShowUpgradePrompt once, synchronously,
+  // very early. Install our override shortly after load so ours takes precedence.
+  function _init(){
+    _installOverride();
+    // Re-assert a few times in case something else re-defines it later.
+    setTimeout(_installOverride, 500);
+    setTimeout(_installOverride, 1500);
+  }
+  if (document.readyState !== 'loading') _init();
+  else document.addEventListener('DOMContentLoaded', _init);
+})();
+</script>
 <script id="ft-owner-tools-js">
 (function(){
   var OWNER_MOBILE = '8591895492';
@@ -10811,17 +10854,18 @@ img[alt="NidhiKosh logo"],
   
   window.__ftGetRestrictionReason = function(type) {
     if(isPremiumActive()) return null;
-    if(type==='add-member') return 'Free plan allows max 20 members. Upgrade to Premium for unlimited members.';
-    if(memberCount() > 20) return 'You have more than 20 members. Upgrade to Premium to edit.';
-    if(orgAgeYears() >= 1) return 'Free plan expired after 1 year. Upgrade to Premium to continue editing.';
+    var howTo = ' Go to More (bottom right ⚙️) → Subscription to upgrade.';
+    if(type==='add-member') return 'Free plan allows max 20 members. Upgrade to Premium for unlimited members.' + howTo;
+    if(memberCount() > 20) return 'You have more than 20 members. Upgrade to Premium to edit.' + howTo;
+    if(orgAgeYears() >= 1) return 'Free plan expired after 1 year. Upgrade to Premium to continue editing.' + howTo;
     return null;
   };
   
   // Show subscription prompt
   window.__ftShowUpgradePrompt = function(reason) {
-    var msg = reason || 'Upgrade to Premium to continue editing.';
+    var msg = reason || 'Upgrade to Premium to continue editing. Go to More (bottom right ⚙️) → Subscription to upgrade.';
     if(window.__ftNavMore) {
-      if(confirm(msg + '\n\nGo to Subscription?')) {
+      if(confirm(msg + '\n\nGo to Subscription now?')) {
         window.__ftNavMore('subscription');
       }
     } else {
