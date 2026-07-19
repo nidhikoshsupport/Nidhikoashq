@@ -842,7 +842,7 @@
       '<div style="flex:1;min-width:0;"><div style="color:' + C.text + ';font-weight:900;font-size:14px;">Owner Tools</div>' +
       '<div style="color:' + C.sub + ';font-size:11.5px;font-weight:700;margin-top:2px;">Manage subscriptions, organisations &amp; users</div></div>' +
       '<div style="color:' + C.sub + ';font-size:18px;">›</div>';
-    toolsBtn.onclick = function(){ ov.remove(); _showOwnerTools(); };
+    toolsBtn.onclick = function(){ ov.remove(); _showOwnerLogin(); };
 
     var myOrgBtn = _el('div',
       'text-align:left;border-radius:16px;background:' + C.card + ';border:1px solid ' + C.border + ';' +
@@ -860,6 +860,61 @@
     ov.appendChild(wrap);
   }
 
+  // ---------------- Owner Login (Email + Password) ----------------
+  var OWNER_EMAIL = 'nidhikosh.support@gmail.com';
+
+  function _showOwnerLogin(){
+    var ov = _overlay();
+    var wrap = _el('div', 'max-width:380px;margin:0 auto;padding:60px 20px 40px;');
+
+    wrap.appendChild(_el('div',
+      'width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#4f46e5,#7c3aed);' +
+      'display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;',
+      '👑'
+    ));
+    wrap.appendChild(_el('div', 'color:' + C.text + ';font-weight:900;font-size:18px;margin-bottom:4px;text-align:center;', 'Owner Login'));
+    wrap.appendChild(_el('div', 'color:' + C.sub + ';font-size:12.5px;font-weight:700;margin-bottom:22px;text-align:center;', 'Sign in to access Owner Tools'));
+
+    var card = _el('div', 'border-radius:16px;background:' + C.card + ';border:1px solid ' + C.border + ';padding:20px;');
+    card.innerHTML =
+      '<div style="color:' + C.sub + ';font-size:10.5px;font-weight:800;text-transform:uppercase;margin-bottom:6px;">Email</div>' +
+      '<input id="ft-ownlog-email" type="email" autocapitalize="off" autocomplete="username" style="width:100%;box-sizing:border-box;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid ' + C.border + ';padding:12px 14px;color:' + C.text + ';font-size:14px;margin-bottom:14px;" />' +
+      '<div style="color:' + C.sub + ';font-size:10.5px;font-weight:800;text-transform:uppercase;margin-bottom:6px;">Password</div>' +
+      '<input id="ft-ownlog-pass" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid ' + C.border + ';padding:12px 14px;color:' + C.text + ';font-size:14px;margin-bottom:8px;" />' +
+      '<div id="ft-ownlog-err" style="color:#f87171;font-size:12px;font-weight:700;min-height:16px;margin-bottom:10px;"></div>' +
+      '<div id="ft-ownlog-btn" style="text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-weight:900;font-size:14px;cursor:pointer;">Login</div>' +
+      '<div id="ft-ownlog-cancel" style="text-align:center;padding:12px;color:' + C.sub + ';font-weight:700;font-size:12.5px;cursor:pointer;">Cancel</div>';
+
+    wrap.appendChild(card);
+    ov.appendChild(wrap);
+
+    var errEl = card.querySelector('#ft-ownlog-err');
+    var btnEl = card.querySelector('#ft-ownlog-btn');
+
+    card.querySelector('#ft-ownlog-cancel').onclick = function(){ ov.remove(); };
+
+    btnEl.onclick = function(){
+      var email = card.querySelector('#ft-ownlog-email').value.trim();
+      var pass = card.querySelector('#ft-ownlog-pass').value;
+      if (!email || !pass) { errEl.textContent = 'Enter email and password.'; return; }
+      if (email.toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
+        errEl.textContent = 'This email is not authorised for Owner Tools.';
+        return;
+      }
+      errEl.textContent = '';
+      btnEl.textContent = 'Signing in...';
+      firebase.auth().signInWithEmailAndPassword(email, pass).then(function(){
+        if(window.__ftDebugLog)window.__ftDebugLog('Owner email login OK','ok');
+        ov.remove();
+        _showOwnerTools();
+      }).catch(function(e){
+        btnEl.textContent = 'Login';
+        errEl.textContent = 'Incorrect email or password.';
+        if(window.__ftDebugLog)window.__ftDebugLog('Owner email login FAILED: '+(e&&e.message||e),'error');
+      });
+    };
+  }
+
   // ---------------- Owner Tools main panel ----------------
   function _showOwnerTools(){
     var ov = _overlay();
@@ -871,7 +926,18 @@
       'display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;',
       '‹'
     );
-    backBtn.onclick = function(){ ov.remove(); };
+    backBtn.onclick = function(){
+      ov.remove();
+      // Return to the normal anonymous session so the app's own org sync/usage
+      // (and everyone else's Firestore access under the regular rules) continues
+      // exactly as before -- the owner's elevated email session was only needed
+      // for this Owner Tools visit.
+      firebase.auth().signInAnonymously().then(function(){
+        if(window.__ftDebugLog)window.__ftDebugLog('Returned to anonymous session after Owner Tools','ok');
+      }).catch(function(e){
+        if(window.__ftDebugLog)window.__ftDebugLog('Return-to-anonymous FAILED: '+(e&&e.message||e),'error');
+      });
+    };
     header.appendChild(backBtn);
     header.appendChild(_el('div', '',
       '<div style="color:' + C.text + ';font-weight:900;font-size:15px;">Owner Tools</div>' +
