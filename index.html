@@ -686,7 +686,6 @@
       var orgId = _getActiveOrgId();
       var raw = localStorage.getItem('ft_subscription_'+orgId);
       var s = JSON.parse(raw||'null');
-      if(window.__ftDebugLog)window.__ftDebugLog('__ftGetSubscription called, orgId='+orgId+', raw='+raw,'info');
       if (s && s.plan) {
         var today = new Date().toISOString().slice(0,10);
         var isExpired = s.plan === 'PREMIUM' && s.expiryDate && today > s.expiryDate;
