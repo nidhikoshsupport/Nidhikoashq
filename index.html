@@ -246,6 +246,12 @@
         if(window.__ftDebugLog)window.__ftDebugLog('Pushed '+suffix+' to cloud (org '+orgId+')','ok');
       }).catch(function(e){
         if(window.__ftDebugLog)window.__ftDebugLog(suffix+' push FAILED (org '+orgId+'): '+(e&&e.message||e),'error');
+        // Don't treat a failed push as "synced" -- clear the dedup markers so
+        // the next poll tick retries automatically (e.g. once real auth
+        // completes and permission is granted), instead of silently never
+        // trying this value again.
+        delete _lastPushed[pk];
+        delete _pollKnown[pk];
       });
     }catch(outerErr){
       if(window.__ftDebugLog)window.__ftDebugLog('_pushFieldToCloud THREW ('+suffix+'): '+(outerErr&&outerErr.message||outerErr),'error');
@@ -425,6 +431,7 @@
         if(window.__ftDebugLog)window.__ftDebugLog('Pushed subscription to cloud (org '+orgId+')','ok');
       }).catch(function(e){
         if(window.__ftDebugLog)window.__ftDebugLog('subscription push FAILED ('+orgId+'): '+(e&&e.message||e),'error');
+        delete _lastSubPushed[orgId];
       });
     }catch(e){
       if(window.__ftDebugLog)window.__ftDebugLog('_pushSubscription THREW: '+(e&&e.message||e),'error');
@@ -470,6 +477,7 @@
           if(window.__ftDebugLog)window.__ftDebugLog('Pushed appUser to cloud (mobile '+mobile+')','ok');
         }).catch(function(e){
           if(window.__ftDebugLog)window.__ftDebugLog('appUser push FAILED ('+mobile+'): '+(e&&e.message||e),'error');
+          _lastUsersJSON = null; // retry this whole scan next poll tick
         });
       });
     }catch(e){
@@ -494,6 +502,7 @@
           if(window.__ftDebugLog)window.__ftDebugLog('Pushed org metadata to cloud (org '+o.id+')','ok');
         }).catch(function(e){
           if(window.__ftDebugLog)window.__ftDebugLog('org metadata push FAILED ('+o.id+'): '+(e&&e.message||e),'error');
+          _lastOrgsMetaJSON = null; // retry this whole scan next poll tick
         });
       });
     }catch(e){
@@ -625,20 +634,47 @@
     if (_bannerEl) { _bannerEl.remove(); _bannerEl = null; }
   }
 
+  // Find a stable anchor already present whenever the user is logged in (the
+  // top user-info row containing the "Logout" button), so the banner can be
+  // inserted as normal page content right below it -- not as a floating
+  // overlay on top of everything.
+  function _findAnchor(){
+    var all = document.querySelectorAll('div,button');
+    for (var i = 0; i < all.length; i++){
+      if (all[i].children.length === 0 && all[i].textContent.trim() === 'Logout') {
+        // walk up to the row that contains this button, then its parent
+        // (the header block) is what we insert after.
+        var row = all[i];
+        for (var hop = 0; hop < 4 && row.parentElement; hop++){
+          row = row.parentElement;
+          if (row.nextElementSibling) return row;
+        }
+      }
+    }
+    return null;
+  }
+
   function _showBanner(email){
-    if (_bannerEl) return; // already showing
+    if (_bannerEl && document.body.contains(_bannerEl)) {
+      if (_bannerEl.dataset.email === email) return; // already showing for this email
+      _bannerEl.remove();
+      _bannerEl = null;
+    }
+    var anchor = _findAnchor();
+    if (!anchor) return; // try again on next check
+
     _bannerEl = document.createElement('div');
+    _bannerEl.dataset.email = email;
     _bannerEl.style.cssText =
-      'position:fixed;left:10px;right:10px;bottom:10px;z-index:2147482900;' +
-      'background:#78350f;border:1px solid #f59e0b;border-radius:14px;padding:12px 14px;' +
-      'font-family:Nunito,Arial,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35);' +
+      'background:#78350f;border:1px solid #f59e0b;border-radius:14px;padding:12px 14px;margin:10px 14px;' +
+      'font-family:Nunito,Arial,sans-serif;' +
       'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
     _bannerEl.innerHTML =
       '<div style="flex:1;min-width:200px;color:#fde68a;font-size:12.5px;font-weight:700;line-height:1.4;">' +
       '\u26a0\ufe0f Please verify your email (' + email + '). Used to reset your PIN if forgotten.' +
       '</div>' +
       '<div id="ft-verify-resend-btn" style="background:#f59e0b;color:#1e1300;font-weight:900;font-size:12px;padding:8px 14px;border-radius:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Resend Email</div>';
-    (document.body || document.documentElement).appendChild(_bannerEl);
+    anchor.parentNode.insertBefore(_bannerEl, anchor.nextElementSibling);
 
     _bannerEl.querySelector('#ft-verify-resend-btn').onclick = function(){
       var btn = _bannerEl.querySelector('#ft-verify-resend-btn');
@@ -657,14 +693,17 @@
     };
   }
 
+  var _pendingEmail = null;
+
   function _checkVerification(){
     try{
       var user = firebase.auth().currentUser;
-      if (!user || user.isAnonymous || !user.email) { _removeBanner(); return; }
+      if (!user || user.isAnonymous || !user.email) { _removeBanner(); _pendingEmail = null; return; }
       user.reload().then(function(){
         if (user.emailVerified) {
-          _removeBanner();
+          _removeBanner(); _pendingEmail = null;
         } else {
+          _pendingEmail = user.email;
           _showBanner(user.email);
         }
       }).catch(function(){
@@ -678,6 +717,17 @@
   function _init(){
     setInterval(_checkVerification, 15000);
     setTimeout(_checkVerification, 4000); // give real-auth sign-in a moment to complete first
+
+    // The app's own screens re-render on navigation and can wipe out our
+    // manually-inserted banner; watch for that and reinsert immediately
+    // instead of waiting for the next 15s check.
+    var observer = new MutationObserver(function(){
+      if (_pendingEmail && (!_bannerEl || !document.body.contains(_bannerEl))) {
+        _bannerEl = null;
+        _showBanner(_pendingEmail);
+      }
+    });
+    observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
   }
 
   if (document.readyState !== 'loading') _init();
