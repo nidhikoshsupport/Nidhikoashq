@@ -585,14 +585,24 @@
   };
 
   // ---------------- Handle the return from Google's redirect ----------------
+  if(window.__ftDebugLog)window.__ftDebugLog('Checking for pending Google redirect result...','info');
   firebase.auth().getRedirectResult().then(function(result){
-    if (!result || !result.user) return;
-    var info = result.additionalUserInfo;
-    if (!info || info.providerId !== 'google.com') return; // not a Google sign-in result
+    if (!result) {
+      if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult: no result object','info');
+      return;
+    }
+    if (!result.user) {
+      if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult: result had no user (no pending redirect)','info');
+      return;
+    }
 
     var user = result.user;
     var email = (user.email || '').trim();
-    if (!email) return;
+    if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult: got user, email='+email+', uid='+user.uid,'ok');
+    if (!email) {
+      if(window.__ftDebugLog)window.__ftDebugLog('Google account has no email -- cannot proceed','error');
+      return;
+    }
     if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in completed for '+email,'ok');
 
     var users = [];
@@ -607,8 +617,7 @@
       _showMobileCapture(email, user.displayName || '');
     }
   }).catch(function(e){
-    if (e && e.code === 'auth/no-auth-event') return; // normal: fires when there's no pending redirect result
-    if(window.__ftDebugLog)window.__ftDebugLog('Google redirect result FAILED: '+(e&&e.message||e),'error');
+    if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult CATCH: code='+(e&&e.code)+' msg='+(e&&e.message||e),(e&&e.code==='auth/no-auth-event')?'info':'error');
   });
 
   // ---------------- One-time mobile-number capture for new Google users ----------------
