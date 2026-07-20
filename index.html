@@ -601,15 +601,23 @@
   observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
   setInterval(_tryInjectButton, 1000);
 
+  var _ftGoogleInProgress = false;
   window.__ftGoogleSignIn = function(){
+    if (_ftGoogleInProgress) {
+      if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped again while already in progress -- ignoring','info');
+      return;
+    }
+    _ftGoogleInProgress = true;
     var provider = new firebase.auth.GoogleAuthProvider();
     if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped -- opening popup...','info');
     firebase.auth().signInWithPopup(provider).then(function(result){
+      _ftGoogleInProgress = false;
       var user = result && result.user;
       if (!user) { if(window.__ftDebugLog)window.__ftDebugLog('Popup sign-in: no user returned','error'); return; }
       if(window.__ftDebugLog)window.__ftDebugLog('Popup sign-in OK, uid='+user.uid+' email='+user.email,'ok');
       if (window.__ftHandleGoogleUser) window.__ftHandleGoogleUser(user);
     }).catch(function(e){
+      _ftGoogleInProgress = false;
       if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in FAILED: '+(e&&e.code)+' -- '+(e&&e.message||e),'error');
       if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
         alert('Google sign-in failed: ' + (e && e.message || e));
