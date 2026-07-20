@@ -577,7 +577,11 @@
 
   window.__ftGoogleSignIn = function(){
     var provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithRedirect(provider);
+    if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped -- starting redirect...','info');
+    firebase.auth().signInWithRedirect(provider).catch(function(e){
+      if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in FAILED to start: '+(e&&e.code)+' -- '+(e&&e.message||e),'error');
+      alert('Google sign-in failed to start: ' + (e && e.message || e));
+    });
   };
 
   // ---------------- Handle the return from Google's redirect ----------------
