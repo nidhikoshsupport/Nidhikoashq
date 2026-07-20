@@ -671,9 +671,10 @@
           try { localUsers = JSON.parse(localStorage.getItem('ft_appUsers') || '[]'); } catch(e){}
           localUsers.push(cloudUser);
           localStorage.setItem('ft_appUsers', JSON.stringify(localUsers));
-          var refreshed = _refreshJoinedOrgsByEmail(cloudUser);
-          localStorage.setItem('ft_appUser', JSON.stringify(refreshed));
-          location.reload();
+          _refreshJoinedOrgsByEmail(cloudUser).then(function(refreshed){
+            localStorage.setItem('ft_appUser', JSON.stringify(refreshed));
+            location.reload();
+          });
         } else {
           _showMobileCapture(email, user.displayName || '');
         }
@@ -691,29 +692,64 @@
   // orgs an admin added them to since their last login show up immediately.
   function _refreshJoinedOrgsByEmail(userRecord){
     var email = (userRecord.email || '').toLowerCase();
-    if (!email) return userRecord;
-    var orgs = [];
-    try { orgs = JSON.parse(localStorage.getItem('ft_global_orgs') || '[]'); } catch(e){}
-    var joinedOrgs = [];
-    orgs.forEach(function(o){
-      var raw = localStorage.getItem('ft_org_' + o.id + '_members');
-      if (!raw) return;
-      var members;
-      try { members = JSON.parse(raw); } catch(e){ return; }
-      if (!Array.isArray(members)) return;
-      var match = members.find(function(m){ return m.email && m.email.toLowerCase() === email; });
-      if (match) {
-        var existingEntry = (userRecord.joinedOrgs || []).find(function(j){ return j.orgId === o.id; });
-        joinedOrgs.push({ orgId: o.id, joinedAt: existingEntry ? existingEntry.joinedAt : new Date().toISOString().slice(0,10) });
-      }
+    if (!email || !window.__db) return Promise.resolve(userRecord);
+    // Query the CLOUD directly for every org this email is a member of --
+    // not just orgs already known on this device. This is what makes an
+    // org visible after switching accounts/devices, since local scanning
+    // alone can never discover an org this device has zero footprint for.
+    return window.__db.collection('orgs').where('memberEmails', 'array-contains', email).get().then(function(querySnap){
+      var joinedOrgs = [];
+      var globalOrgs = [];
+      try { globalOrgs = JSON.parse(localStorage.getItem('ft_global_orgs') || '[]'); } catch(e){}
+      var existingIds = globalOrgs.map(function(o){ return o.id; });
+      var _CONTENT_SUFFIXES = ['members','banks','ledger','permissions','customRoles','guests',
+                               'incomeCats','expenseCats','mnSettings','penaltySettings','stmtNo','stmtMo'];
+
+      querySnap.forEach(function(docSnap){
+        var orgId = docSnap.id;
+        var data = docSnap.data() || {};
+        var existingEntry = (userRecord.joinedOrgs || []).find(function(j){ return j.orgId === orgId; });
+        joinedOrgs.push({ orgId: orgId, joinedAt: existingEntry ? existingEntry.joinedAt : new Date().toISOString().slice(0,10) });
+
+        if (existingIds.indexOf(orgId) === -1) {
+          globalOrgs.push({
+            id: orgId,
+            name: data.orgMeta_name || 'Organisation',
+            code: data.orgMeta_code || '',
+            createdAt: data.orgMeta_createdAt || '',
+            phone: data.orgMeta_phone || '',
+            email: data.orgMeta_email || '',
+            address: data.orgMeta_address || '',
+            pan: data.orgMeta_pan || '',
+            regNo: data.orgMeta_regNo || '',
+            archivedAt: data.orgMeta_archivedAt || undefined
+          });
+          existingIds.push(orgId);
+          if(window.__ftDebugLog)window.__ftDebugLog('Restored org metadata locally for '+orgId,'ok');
+        }
+
+        _CONTENT_SUFFIXES.forEach(function(suffix){
+          if (!(suffix in data)) return;
+          var key = 'ft_org_' + orgId + '_' + suffix;
+          if (localStorage.getItem(key) === null) {
+            localStorage.setItem(key, JSON.stringify(data[suffix]));
+          }
+        });
+      });
+
+      localStorage.setItem('ft_global_orgs', JSON.stringify(globalOrgs));
+      if(window.__ftDebugLog)window.__ftDebugLog('Refreshed org access (cloud) for '+email+': '+joinedOrgs.length+' org(s)','ok');
+
+      var updated = Object.assign({}, userRecord, { joinedOrgs: joinedOrgs });
+      var all = [];
+      try { all = JSON.parse(localStorage.getItem('ft_appUsers') || '[]'); } catch(e){}
+      all = all.map(function(u){ return u.id === updated.id ? updated : u; });
+      localStorage.setItem('ft_appUsers', JSON.stringify(all));
+      return updated;
+    }).catch(function(e){
+      if(window.__ftDebugLog)window.__ftDebugLog('Refresh org access via cloud query FAILED: '+(e&&e.message||e),'error');
+      return userRecord;
     });
-    if(window.__ftDebugLog)window.__ftDebugLog('Refreshed org access for '+email+': '+joinedOrgs.length+' org(s)','info');
-    var updated = Object.assign({}, userRecord, { joinedOrgs: joinedOrgs });
-    var all = [];
-    try { all = JSON.parse(localStorage.getItem('ft_appUsers') || '[]'); } catch(e){}
-    all = all.map(function(u){ return u.id === updated.id ? updated : u; });
-    localStorage.setItem('ft_appUsers', JSON.stringify(all));
-    return updated;
   }
 
   function _showAccountChoice(email, matches, displayName){
@@ -747,10 +783,12 @@
         choiceEls[i].onclick = function(){
           var idx = parseInt(this.dataset.idx, 10);
           var chosen = matches[idx];
-          chosen = _refreshJoinedOrgsByEmail(chosen);
-          localStorage.setItem('ft_appUser', JSON.stringify(chosen));
-          if(window.__ftDebugLog)window.__ftDebugLog('Continuing as '+chosen.mobile+' ('+email+')','ok');
-          location.reload();
+          if(window.__ftDebugLog)window.__ftDebugLog('Checking cloud for latest org access...','info');
+          _refreshJoinedOrgsByEmail(chosen).then(function(updated){
+            localStorage.setItem('ft_appUser', JSON.stringify(updated));
+            if(window.__ftDebugLog)window.__ftDebugLog('Continuing as '+updated.mobile+' ('+email+')','ok');
+            location.reload();
+          });
         };
       }
 
@@ -835,24 +873,6 @@
         return;
       }
 
-      // Find any orgs where an admin has already added this Google email
-      // as a member -- matching is by EMAIL now, not by mobile, since email
-      // is the one thing we know is really verified (via Google).
-      var orgs = [];
-      try { orgs = JSON.parse(localStorage.getItem('ft_global_orgs') || '[]'); } catch(e){}
-      var joinedOrgs = [];
-      var emailLower = email.toLowerCase();
-      orgs.forEach(function(o){
-        var raw = localStorage.getItem('ft_org_' + o.id + '_members');
-        if (!raw) return;
-        var members;
-        try { members = JSON.parse(raw); } catch(e){ return; }
-        if (!Array.isArray(members)) return;
-        var match = members.find(function(m){ return m.email && m.email.toLowerCase() === emailLower; });
-        if (match) joinedOrgs.push({ orgId: o.id, joinedAt: new Date().toISOString().slice(0,10) });
-      });
-      if(window.__ftDebugLog)window.__ftDebugLog('Email-based org match: found '+joinedOrgs.length+' org(s) for '+email,'info');
-
       var newUser = {
         id: 'u' + Date.now(),
         firstName: first,
@@ -862,14 +882,16 @@
         email: email,
         pin: null,
         authProvider: 'google',
-        joinedOrgs: joinedOrgs,
+        joinedOrgs: [],
         createdAt: new Date().toISOString().slice(0,10)
       };
       users.push(newUser);
       localStorage.setItem('ft_appUsers', JSON.stringify(users));
-      localStorage.setItem('ft_appUser', JSON.stringify(newUser));
-      if(window.__ftDebugLog)window.__ftDebugLog('New Google account created, mobile '+mobile,'ok');
-      location.reload();
+      if(window.__ftDebugLog)window.__ftDebugLog('New Google account created, mobile '+mobile+' -- checking cloud for org access...','info');
+      _refreshJoinedOrgsByEmail(newUser).then(function(updated){
+        localStorage.setItem('ft_appUser', JSON.stringify(updated));
+        location.reload();
+      });
     };
   }
 })();
