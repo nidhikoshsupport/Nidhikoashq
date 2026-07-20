@@ -4219,9 +4219,13 @@ react-dom/cjs/react-dom-client.production.js:
           var fname = safeName + '_' + d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '.pdf';
           var blob = pdf.output('blob');
 
-          // Try native share sheet with the PDF file (works online / installed app)
+          // Try native share sheet with the PDF file (works online / installed app) --
+          // except on iOS/WebKit, where sharing a File this way is known to
+          // sometimes rename it to a random internal UUID instead of using
+          // file.name. On iOS we always use the reliable download-link path.
+          var _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
           var file = null;
-          try { file = new File([blob], fname, { type: 'application/pdf' }); } catch (e) {}
+          if (!_isIOS) { try { file = new File([blob], fname, { type: 'application/pdf' }); } catch (e) {} }
           if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
             navigator.share({ files: [file], title: title })
               .catch(function(err) {
