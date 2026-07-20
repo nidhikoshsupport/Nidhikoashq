@@ -909,13 +909,28 @@
         var txt = (el.textContent || '').trim();
         if (txt === 'Logout' || txt === '\u21AA Logout'){
           try {
+            // Clear session-scoped local state that must NOT survive a
+            // logout -- most importantly activeOrgId, which if left over
+            // can cause the NEXT logged-in account's actions (e.g. creating
+            // an organisation) to silently operate on the PREVIOUS user's
+            // org instead of a fresh one.
+            localStorage.removeItem('ft_global_activeOrgId');
+            localStorage.removeItem('ft_appUser');
+            localStorage.removeItem('ft_guest_session');
+
             var user = firebase.auth().currentUser;
+            var _finish = function(){
+              if(window.__ftDebugLog)window.__ftDebugLog('Logout: cleared activeOrgId + session, reloading fresh','ok');
+              location.reload();
+            };
             if (user && !user.isAnonymous) {
-              firebase.auth().signOut().then(function(){
-                if(window.__ftDebugLog)window.__ftDebugLog('Real Firebase session signed out (app logout)','ok');
-              });
+              firebase.auth().signOut().then(_finish).catch(_finish);
+            } else {
+              _finish();
             }
-          } catch(err){}
+          } catch(err){
+            location.reload();
+          }
           return;
         }
       }
