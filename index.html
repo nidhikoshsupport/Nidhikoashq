@@ -187,16 +187,30 @@
       if(window.__ftDebugLog)window.__ftDebugLog("getRedirectResult (init) note: "+(e&&e.code)+" "+(e&&e.message||e),"info");
     }).then(function(){
       var user = firebase.auth().currentUser;
-      var googlePending = sessionStorage.getItem('ft_google_pending') === '1';
-      if (user && !user.isAnonymous && googlePending) {
-        sessionStorage.removeItem('ft_google_pending');
+      if(window.__ftDebugLog)window.__ftDebugLog("Post-redirect-check currentUser: "+(user?(user.uid+(user.isAnonymous?" (anonymous)":" (real: "+user.email+")")):"none"),"info");
+      if (user && !user.isAnonymous) {
+        // A real (non-anonymous) session exists -- this only ever happens via
+        // Google (or another real provider), never via our own anonymous
+        // init. Check if we've already fully processed this account locally;
+        // if not, hand it off to the Google-account handler (existing-match
+        // or new-user mobile capture) instead of relying on any redirect
+        // flag, which is not reliable to persist across the OAuth redirect
+        // hop in some mobile browsers.
         window.__fbAuthReady = true;
-        if(window.__ftDebugLog)window.__ftDebugLog("Fresh Google sign-in detected, uid="+user.uid+" email="+user.email,"ok");
         window.dispatchEvent(new CustomEvent("ft-fb-auth-ready"));
-        if (window.__ftHandleGoogleUser) window.__ftHandleGoogleUser(user);
+        var alreadyHandled = false;
+        try {
+          var existingLocal = JSON.parse(localStorage.getItem('ft_appUser') || 'null');
+          if (existingLocal && existingLocal.email && user.email && existingLocal.email.toLowerCase() === user.email.toLowerCase()) {
+            alreadyHandled = true;
+          }
+        } catch(e){}
+        if (!alreadyHandled && window.__ftHandleGoogleUser) {
+          if(window.__ftDebugLog)window.__ftDebugLog("Real session not yet linked locally -- handing off to Google handler","ok");
+          window.__ftHandleGoogleUser(user);
+        }
         return;
       }
-      if (googlePending) sessionStorage.removeItem('ft_google_pending');
       if (user) {
         window.__fbAuthReady = true;
         if(window.__ftDebugLog)window.__ftDebugLog("Existing Firebase session restored, uid="+user.uid+(user.isAnonymous?" (anonymous)":" (real: "+user.email+")"),"ok");
@@ -589,11 +603,17 @@
 
   window.__ftGoogleSignIn = function(){
     var provider = new firebase.auth.GoogleAuthProvider();
-    sessionStorage.setItem('ft_google_pending', '1');
-    if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped -- starting redirect...','info');
-    firebase.auth().signInWithRedirect(provider).catch(function(e){
-      if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in FAILED to start: '+(e&&e.code)+' -- '+(e&&e.message||e),'error');
-      alert('Google sign-in failed to start: ' + (e && e.message || e));
+    if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped -- opening popup...','info');
+    firebase.auth().signInWithPopup(provider).then(function(result){
+      var user = result && result.user;
+      if (!user) { if(window.__ftDebugLog)window.__ftDebugLog('Popup sign-in: no user returned','error'); return; }
+      if(window.__ftDebugLog)window.__ftDebugLog('Popup sign-in OK, uid='+user.uid+' email='+user.email,'ok');
+      if (window.__ftHandleGoogleUser) window.__ftHandleGoogleUser(user);
+    }).catch(function(e){
+      if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in FAILED: '+(e&&e.code)+' -- '+(e&&e.message||e),'error');
+      if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+        alert('Google sign-in failed: ' + (e && e.message || e));
+      }
     });
   };
 
