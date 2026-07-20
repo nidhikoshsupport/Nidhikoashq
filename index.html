@@ -4219,11 +4219,18 @@ react-dom/cjs/react-dom-client.production.js:
           var fname = safeName + '_' + d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '.pdf';
           var blob = pdf.output('blob');
 
-          // Try native share sheet with the PDF file (works online / installed app) --
-          // except on iOS/WebKit, where sharing a File this way is known to
-          // sometimes rename it to a random internal UUID instead of using
-          // file.name. On iOS we always use the reliable download-link path.
+          // On iOS/WebKit, our own blob+anchor download was still showing up
+          // with a random internal name once shared to WhatsApp or saved via
+          // the Downloads panel. jsPDF's own .save() has been battle-tested
+          // across browsers for exactly this, so use it directly on iOS
+          // instead of building the blob URL ourselves.
           var _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          if (_isIOS) {
+            pdf.save(fname);
+            _toastPDF('\ud83d\udcc4 PDF saved \u2014 open it and use the share icon to send on WhatsApp');
+            done();
+            return;
+          }
           var file = null;
           if (!_isIOS) { try { file = new File([blob], fname, { type: 'application/pdf' }); } catch (e) {} }
           if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
