@@ -183,8 +183,20 @@
     window.__fbReady = true;
     console.log("Firebase initialized OK");
     if(window.__ftDebugLog)window.__ftDebugLog("Firebase SDK initialized","ok");
-    var _unsubInit = firebase.auth().onAuthStateChanged(function(user){
-      _unsubInit();
+    firebase.auth().getRedirectResult().catch(function(e){
+      if(window.__ftDebugLog)window.__ftDebugLog("getRedirectResult (init) note: "+(e&&e.code)+" "+(e&&e.message||e),"info");
+    }).then(function(){
+      var user = firebase.auth().currentUser;
+      var googlePending = sessionStorage.getItem('ft_google_pending') === '1';
+      if (user && !user.isAnonymous && googlePending) {
+        sessionStorage.removeItem('ft_google_pending');
+        window.__fbAuthReady = true;
+        if(window.__ftDebugLog)window.__ftDebugLog("Fresh Google sign-in detected, uid="+user.uid+" email="+user.email,"ok");
+        window.dispatchEvent(new CustomEvent("ft-fb-auth-ready"));
+        if (window.__ftHandleGoogleUser) window.__ftHandleGoogleUser(user);
+        return;
+      }
+      if (googlePending) sessionStorage.removeItem('ft_google_pending');
       if (user) {
         window.__fbAuthReady = true;
         if(window.__ftDebugLog)window.__ftDebugLog("Existing Firebase session restored, uid="+user.uid+(user.isAnonymous?" (anonymous)":" (real: "+user.email+")"),"ok");
@@ -577,6 +589,7 @@
 
   window.__ftGoogleSignIn = function(){
     var provider = new firebase.auth.GoogleAuthProvider();
+    sessionStorage.setItem('ft_google_pending', '1');
     if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped -- starting redirect...','info');
     firebase.auth().signInWithRedirect(provider).catch(function(e){
       if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in FAILED to start: '+(e&&e.code)+' -- '+(e&&e.message||e),'error');
@@ -584,26 +597,17 @@
     });
   };
 
-  // ---------------- Handle the return from Google's redirect ----------------
-  if(window.__ftDebugLog)window.__ftDebugLog('Checking for pending Google redirect result...','info');
-  firebase.auth().getRedirectResult().then(function(result){
-    if (!result) {
-      if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult: no result object','info');
-      return;
-    }
-    if (!result.user) {
-      if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult: result had no user (no pending redirect)','info');
-      return;
-    }
-
-    var user = result.user;
+  // This module's own redirect-result check has been consolidated into
+  // firebase-init-js (which now calls getRedirectResult() exactly once,
+  // before deciding anonymous-vs-restored session). It calls
+  // window.__ftHandleGoogleUser(user) when a fresh Google sign-in is found.
+  window.__ftHandleGoogleUser = function(user){
     var email = (user.email || '').trim();
-    if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult: got user, email='+email+', uid='+user.uid,'ok');
+    if(window.__ftDebugLog)window.__ftDebugLog('Handling fresh Google sign-in, email='+email+', uid='+user.uid,'ok');
     if (!email) {
       if(window.__ftDebugLog)window.__ftDebugLog('Google account has no email -- cannot proceed','error');
       return;
     }
-    if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in completed for '+email,'ok');
 
     var users = [];
     try { users = JSON.parse(localStorage.getItem('ft_appUsers') || '[]'); } catch(e){}
@@ -616,9 +620,7 @@
     } else {
       _showMobileCapture(email, user.displayName || '');
     }
-  }).catch(function(e){
-    if(window.__ftDebugLog)window.__ftDebugLog('getRedirectResult CATCH: code='+(e&&e.code)+' msg='+(e&&e.message||e),(e&&e.code==='auth/no-auth-event')?'info':'error');
-  });
+  };
 
   // ---------------- One-time mobile-number capture for new Google users ----------------
   function _showMobileCapture(email, displayName){
