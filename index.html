@@ -654,39 +654,63 @@
 
     var card = document.createElement('div');
     card.style.cssText = 'width:100%;max-width:400px;';
-    var itemsHtml = matches.map(function(u, idx){
-      return '<div class="ft-acct-choice" data-idx="'+idx+'" style="background:'+C.card+';border:1px solid '+C.border+';border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;">' +
-        '<div style="color:'+C.text+';font-weight:800;font-size:14px;">'+(u.name||'')+'</div>' +
-        '<div style="color:'+C.sub+';font-size:12px;margin-top:2px;">Mobile: '+(u.mobile||'')+'</div>' +
-        '</div>';
-    }).join('');
 
-    card.innerHTML =
-      '<div style="text-align:center;margin-bottom:18px;">' +
-      '<div style="color:'+C.text+';font-weight:900;font-size:18px;">Signed in as '+email+'</div>' +
-      '<div style="color:'+C.sub+';font-size:12.5px;margin-top:6px;">Choose a profile to continue, or add a new one</div>' +
-      '</div>' +
-      itemsHtml +
-      '<div id="ft-acct-new" style="text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#065f46,#059669);color:#fff;font-weight:800;font-size:13.5px;cursor:pointer;margin-top:6px;">+ Add a New Profile (different mobile number)</div>';
+    function render(){
+      var itemsHtml = matches.map(function(u, idx){
+        return '<div style="background:'+C.card+';border:1px solid '+C.border+';border-radius:12px;margin-bottom:10px;display:flex;align-items:stretch;overflow:hidden;">' +
+          '<div class="ft-acct-choice" data-idx="'+idx+'" style="flex:1;padding:14px 16px;cursor:pointer;">' +
+          '<div style="color:'+C.text+';font-weight:800;font-size:14px;">'+(u.name||'')+'</div>' +
+          '<div style="color:'+C.sub+';font-size:12px;margin-top:2px;">Mobile: '+(u.mobile||'')+'</div>' +
+          '</div>' +
+          '<div class="ft-acct-del" data-idx="'+idx+'" style="width:52px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#f87171;font-size:20px;border-left:1px solid '+C.border+';">\u00D7</div>' +
+          '</div>';
+      }).join('');
 
-    ov.appendChild(card);
-    (document.body || document.documentElement).appendChild(ov);
+      card.innerHTML =
+        '<div style="text-align:center;margin-bottom:18px;">' +
+        '<div style="color:'+C.text+';font-weight:900;font-size:18px;">Signed in as '+email+'</div>' +
+        '<div style="color:'+C.sub+';font-size:12.5px;margin-top:6px;">Choose a profile to continue, or add a new one</div>' +
+        '</div>' +
+        itemsHtml +
+        '<div id="ft-acct-new" style="text-align:center;padding:13px;border-radius:12px;background:linear-gradient(135deg,#065f46,#059669);color:#fff;font-weight:800;font-size:13.5px;cursor:pointer;margin-top:6px;">+ Add a New Profile (different mobile number)</div>';
 
-    var choiceEls = card.querySelectorAll('.ft-acct-choice');
-    for (var i = 0; i < choiceEls.length; i++){
-      choiceEls[i].onclick = function(){
-        var idx = parseInt(this.dataset.idx, 10);
-        var chosen = matches[idx];
-        localStorage.setItem('ft_appUser', JSON.stringify(chosen));
-        if(window.__ftDebugLog)window.__ftDebugLog('Continuing as '+chosen.mobile+' ('+email+')','ok');
-        location.reload();
+      var choiceEls = card.querySelectorAll('.ft-acct-choice');
+      for (var i = 0; i < choiceEls.length; i++){
+        choiceEls[i].onclick = function(){
+          var idx = parseInt(this.dataset.idx, 10);
+          var chosen = matches[idx];
+          localStorage.setItem('ft_appUser', JSON.stringify(chosen));
+          if(window.__ftDebugLog)window.__ftDebugLog('Continuing as '+chosen.mobile+' ('+email+')','ok');
+          location.reload();
+        };
+      }
+
+      var delEls = card.querySelectorAll('.ft-acct-del');
+      for (var j = 0; j < delEls.length; j++){
+        delEls[j].onclick = function(){
+          var idx = parseInt(this.dataset.idx, 10);
+          var toDelete = matches[idx];
+          if (!confirm('Remove profile "'+(toDelete.name||'')+'" (Mobile: '+toDelete.mobile+')? This cannot be undone.')) return;
+          var all = [];
+          try { all = JSON.parse(localStorage.getItem('ft_appUsers') || '[]'); } catch(e){}
+          all = all.filter(function(u){ return u.id !== toDelete.id; });
+          localStorage.setItem('ft_appUsers', JSON.stringify(all));
+          matches.splice(idx, 1);
+          if(window.__ftDebugLog)window.__ftDebugLog('Deleted profile, mobile '+toDelete.mobile,'ok');
+          if (matches.length === 0) { ov.remove(); _showMobileCapture(email, displayName); return; }
+          render();
+        };
+      }
+
+      card.querySelector('#ft-acct-new').onclick = function(){
+        ov.remove();
+        _showMobileCapture(email, displayName);
       };
     }
 
-    card.querySelector('#ft-acct-new').onclick = function(){
-      ov.remove();
-      _showMobileCapture(email, displayName);
-    };
+    render();
+    ov.appendChild(card);
+    (document.body || document.documentElement).appendChild(ov);
   }
 
   // ---------------- One-time mobile-number capture for new Google users ----------------
