@@ -11491,8 +11491,8 @@ window.__ftResetOrgDate = function() {
 (function(){
   function renderBirthday(){
     try{
-      var activeView=window.ft_activeView||'home';
-      if(activeView!=='home')return;
+      var activeView=window.ft_activeView||'dashboard';
+      if(activeView!=='dashboard')return;
       var orgId=JSON.parse(localStorage.getItem('ft_global_activeOrgId')||'null')||'org_default';
       var members=JSON.parse(localStorage.getItem('ft_org_'+orgId+'_members')||'[]');
       var today=new Date();
