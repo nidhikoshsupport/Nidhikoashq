@@ -4355,6 +4355,7 @@ react-dom/cjs/react-dom-client.production.js:
       '<div style="display:flex;align-items:center;gap:8px;">'
       + '<div style="flex:1;font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+title+'</div>'
       + '<button id="ft-pdf-share-btn" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">\ud83d\udce4 Share</button>'
+      + '<button id="ft-pdf-excel-btn" style="background:#065f46;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">\ud83d\udcca Excel</button>'
       + '<button id="ft-pdf-close-btn" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:18px;cursor:pointer;flex-shrink:0;">&times;</button>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.2);border-radius:8px;padding:6px 10px;">'
@@ -4424,6 +4425,13 @@ react-dom/cjs/react-dom-client.production.js:
 
     document.getElementById('ft-pdf-share-btn').onclick = function(){
       sharePDFOnWhatsApp(inner, title, this);
+    };
+
+    document.getElementById('ft-pdf-excel-btn').onclick = function(){
+      if (window.__ftExportHtmlTableToExcel) {
+        var safeName = String(title||'Report').replace(/[^a-zA-Z0-9 _-]/g,'').trim().replace(/\s+/g,'_');
+        window.__ftExportHtmlTableToExcel(tableHtml, safeName+'.xlsx');
+      }
     };
 
     // Zoom logic - identical to existing full statement
@@ -5974,7 +5982,7 @@ react-dom/cjs/react-dom-client.production.js:
       '<div style="padding:12px 18px 10px;border-bottom:1px solid #1e3a5f;display:flex;align-items:center;gap:10px;flex-shrink:0;">',
         '<div style="font-size:22px;">\u270d\ufe0f</div>',
         '<div style="flex:1;"><div style="font-size:16px;font-weight:900;color:#f1f5f9;">Write-Off Statement</div><div style="font-size:11px;color:#4a6fa5;">All dues written off per member</div></div>',
-        '<button id="wo-stmt-pdf" style="background:#1e40af;border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;margin-right:8px;">\uD83D\uDCC4 PDF</button>','<button id="wo-stmt-excel" style="background:#065f46;border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;margin-right:8px;">\uD83D\uDCCA Excel</button>','<button id="wo-stmt-close" style="background:none;border:none;color:#4a6fa5;font-size:24px;cursor:pointer;line-height:1;">&times;</button>',
+        '<button id="wo-stmt-pdf" style="background:#1e40af;border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;margin-right:8px;">\uD83D\uDCC4 PDF</button>','<button id="wo-stmt-excel" style="background:#065f46;border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;margin-right:8px;display:none;">\uD83D\uDCCA Excel</button>','<button id="wo-stmt-close" style="background:none;border:none;color:#4a6fa5;font-size:24px;cursor:pointer;line-height:1;">&times;</button>',
       '</div>',
       '<div style="padding:12px 16px;flex-shrink:0;border-bottom:1px solid #1e3a5f;">',
         '<div style="display:flex;gap:8px;margin-bottom:8px;">',
@@ -6463,7 +6471,7 @@ react-dom/cjs/react-dom-client.production.js:
         +'<div style="font-size:11px;color:rgba(255,255,255,.7);">Member payment behaviour</div>'
         +'</div>',
         '<button id="cs-pdf" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;">\uD83D\uDCC4 PDF</button>',
-        '<button id="cs-excel" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;margin-left:6px;">\uD83D\uDCCA Excel</button>',
+        '<button id="cs-excel" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;margin-left:6px;display:none;">\uD83D\uDCCA Excel</button>',
       '</div>',
       // Score legend bar
       '<div style="background:linear-gradient(90deg,#dc2626,#ea580c,#d97706,#16a34a);padding:6px 16px;display:flex;justify-content:space-between;flex-shrink:0;">',
@@ -6558,7 +6566,7 @@ react-dom/cjs/react-dom-client.production.js:
         '<button id="emi-back" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;">\u2190 Back</button>',
         '<div style="flex:1;font-weight:900;font-size:16px;">EMI Calculator</div>',
         '<button id="emi-pdf" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;">\uD83D\uDCC4 PDF</button>',
-        '<button id="emi-excel" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;margin-left:6px;">\uD83D\uDCCA Excel</button>',
+        '<button id="emi-excel" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;margin-left:6px;display:none;">\uD83D\uDCCA Excel</button>',
       '</div>',
       '<div style="padding:16px;display:flex;flex-direction:column;gap:12px;flex-shrink:0;border-bottom:1px solid #1e3a5f;">',
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">',
@@ -8333,7 +8341,7 @@ react-dom/cjs/react-dom-client.production.js:
         '<button id="ann-back" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;">\u2190 Back</button>',
         '<div style="flex:1;font-weight:900;font-size:16px;">\uD83D\uDCC5 Annual Report</div>',
         '<button id="ann-pdf" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;">\uD83D\uDCC4 PDF</button>',
-        '<button id="ann-excel" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;margin-left:6px;">\uD83D\uDCCA Excel</button>',
+        '<button id="ann-excel" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-weight:800;font-size:13px;cursor:pointer;margin-left:6px;display:none;">\uD83D\uDCCA Excel</button>',
       '</div>',
       '<div style="padding:10px 16px;border-bottom:1px solid #e5e7eb;display:flex;gap:8px;align-items:center;background:#fff;flex-shrink:0;">',
         '<select id="ann-year" style="flex:1;background:#fff;color:#111;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:700;">'+yearOpts+'</select>',
@@ -9425,11 +9433,8 @@ function build(){
 
   var rp=section(o,"📊 Reports","reports");
   rp.appendChild(tile("Balance Sheet","📊","","Balance Sheet"));
-  rp.appendChild(tileDirect("Balance Sheet (Excel)","📊","ft30-green",function(){window.__stmtBalanceSheet&&window.__stmtBalanceSheet(true)}));
   rp.appendChild(tile("Cash Flow","📈","ft30-green","Cash Flow"));
-  rp.appendChild(tileDirect("Cash Flow (Excel)","📈","ft30-green",function(){window.__stmtCashFlow&&window.__stmtCashFlow(true)}));
   rp.appendChild(tile("Trial Balance","📉","ft30-purple","Trial Balance"));
-  rp.appendChild(tileDirect("Trial Balance (Excel)","📉","ft30-green",function(){window.__stmtTrialBalance&&window.__stmtTrialBalance(true)}));
   rp.appendChild(tile("Financial Summary","📄","","PDF"));
   rp.appendChild(tile("Annual Report","🗓️","ft30-orange","Annual Rpt"));
   rp.appendChild(tile("Dues Only","₹","ft30-orange","Dues Only"));
@@ -9437,20 +9442,14 @@ function build(){
   var lg=section(o,"📒 Ledgers");
   lg.appendChild(tile("Income / Expense","💹","ft30-green","Inc/Exp"));
   lg.appendChild(tile("Member A/c","👤","ft30-purple","Member A/C"));
-  lg.appendChild(tileDirect("Member A/c (Excel)","👤","ft30-green",function(){window.__stmtMember&&window.__stmtMember(true)}));
   lg.appendChild(tile("Bank / Cash","🏦","ft30-green","Bank/Cash"));
-  lg.appendChild(tileDirect("Bank/Cash (Excel)","🏦","ft30-green",function(){window.__stmtBank&&window.__stmtBank(true)}));
   lg.appendChild(tile("Write Off","🧾","ft30-orange","Write-Offs"));
 
   var rg=section(o,"📋 Registers","registers");
   rg.appendChild(tile("Loan Register","📝","ft30-orange","Loan Register"));
-  rg.appendChild(tileDirect("Loan Register (Excel)","📝","ft30-green",function(){window.__stmtLoanRegister&&window.__stmtLoanRegister(true)}));
   rg.appendChild(tile("Penalty Register","⚡","ft30-red","Penalty Register"));
-  rg.appendChild(tileDirect("Penalty Register (Excel)","⚡","ft30-green",function(){window.__stmtPenaltyRegister&&window.__stmtPenaltyRegister(true)}));
   rg.appendChild(tile("Follow-up List","☷","ft30-orange","Follow-up List"));
-  rg.appendChild(tileDirect("Follow-up List (Excel)","☷","ft30-green",function(){window.__stmtDefaulterReport&&window.__stmtDefaulterReport(true)}));
   rg.appendChild(tile("Interest Accrual","💳","ft30-purple","Interest Accrual"));
-  rg.appendChild(tileDirect("Interest Accrual (Excel)","💳","ft30-green",function(){window.__stmtInterestAccrual&&window.__stmtInterestAccrual(true)}));
 
   var tl=section(o,"🛠️ Tools","tools");
   tl.appendChild(tile("EMI Calculator","🧮","ft30-purple","EMI Calc"));
@@ -9469,7 +9468,6 @@ function build(){
   var ag=section(g,"📋 All Registers");
   ag.appendChild(tile("Loan Register","📝","ft30-orange","Loan Register"));
   ag.appendChild(tile("Member Register","👥","ft30-cyan","Member Register"));
-  ag.appendChild(tileDirect("Member Register (Excel)","👥","ft30-green",function(){window.__stmtMemberRegister&&window.__stmtMemberRegister(true)}));
   ag.appendChild(tile("Penalty Register","⚡","ft30-red","Penalty Register"));
   ag.appendChild(tile("Follow-up List","☷","ft30-orange","Follow-up List"));
   ag.appendChild(tile("Interest Accrual","💳","ft30-purple","Interest Accrual"));
