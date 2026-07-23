@@ -1049,6 +1049,50 @@
   // Same idea as __ftExportTablesToExcel, but takes a raw HTML table string
   // directly (the same tableHtml string each report already builds for its
   // PDF) instead of requiring a visible on-screen <table> element.
+  // Flattens a multi-table HTML block (member name headers + per-section tables)
+  // into ONE Excel sheet, with each member's name as a row followed by their
+  // account rows below it, then the next member's rows below that — instead
+  // of splitting every <table> found into its own sheet.
+  window.__ftExportHtmlMultiTableSingleSheet = function(tableHtml, filename, sheetName){
+    var tmp = document.createElement('div');
+    tmp.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+    tmp.innerHTML = tableHtml;
+    document.body.appendChild(tmp);
+    _loadSheetJS().then(function(){
+      var aoa = [];
+      var maxCols = 1;
+      function cellText(el){ return (el.textContent || '').replace(/\s+/g,' ').trim(); }
+      Array.prototype.forEach.call(tmp.children, function(node){
+        var tag = (node.tagName || '').toLowerCase();
+        if (tag === 'div') {
+          var txt = cellText(node);
+          if (txt) { aoa.push([txt]); }
+        } else if (tag === 'table') {
+          Array.prototype.forEach.call(node.rows, function(row){
+            var rowVals = [];
+            Array.prototype.forEach.call(row.cells, function(cell){
+              var span = cell.colSpan || 1;
+              rowVals.push(cellText(cell));
+              for (var s=1; s<span; s++) rowVals.push('');
+            });
+            if (rowVals.length > maxCols) maxCols = rowVals.length;
+            aoa.push(rowVals);
+          });
+          aoa.push([]);
+        }
+      });
+      if (!aoa.length) { alert('No table data found to export.'); tmp.remove(); return; }
+      var ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      var wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, (sheetName || 'Statement').slice(0, 31));
+      window.XLSX.writeFile(wb, filename || 'Export.xlsx');
+      tmp.remove();
+    }).catch(function(){
+      alert('Could not load Excel export library. Check your internet connection and try again.');
+      tmp.remove();
+    });
+  };
+
   window.__ftExportHtmlTableToExcel = function(tableHtml, filename){
     var tmp = document.createElement('div');
     tmp.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
@@ -5897,7 +5941,7 @@ react-dom/cjs/react-dom-client.production.js:
       });
 
       var subtitle = (mbr2?mbr2.name:'All Members') + (fromDate?' | From: '+fmtDate(fromDate):'') + (toDate?' | To: '+fmtDate(toDate):'');
-      if (asExcel) { if (window.__ftExportHtmlTableToExcel) window.__ftExportHtmlTableToExcel(allTableHTML, 'Membership_Statement.xlsx'); return; }
+      if (asExcel) { if (window.__ftExportHtmlMultiTableSingleSheet) window.__ftExportHtmlMultiTableSingleSheet(allTableHTML, 'Membership_Statement.xlsx', 'Member Accounts'); return; }
       showPDF('Membership Statement', subtitle, getOrgName(),
         new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}),
         (function(){
