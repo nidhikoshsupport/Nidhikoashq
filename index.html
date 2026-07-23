@@ -1166,7 +1166,7 @@
           try {
             var wb = window.XLSX.read(evt.target.result, { type: 'binary', cellDates: true });
             var sheet = wb.Sheets[wb.SheetNames[0]];
-            var rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
+            var rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true, dateNF: 'yyyy-mm-dd' });
             _renderPreview(rows, statusEl, previewEl, ov);
           } catch(err) {
             statusEl.textContent = 'Could not read file: ' + (err && err.message || err);
