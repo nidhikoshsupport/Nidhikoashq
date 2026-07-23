@@ -4650,11 +4650,16 @@ react-dom/cjs/react-dom-client.production.js:
 
   // ===== OPEN SHEET =====
   function openSheet(html) {
+    var isWide = window.innerWidth >= 768;
     var ov = document.createElement('div');
     ov.id = 'ft-stmt-ov';
-    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,13,31,0.88);z-index:9990;display:flex;align-items:flex-end;justify-content:center;';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,13,31,0.88);z-index:9990;display:flex;'
+      + (isWide ? 'align-items:center;justify-content:center;padding:24px;box-sizing:border-box;' : 'align-items:flex-end;justify-content:center;');
     var sheet = document.createElement('div');
-    sheet.style.cssText = 'background:#0d1b2e;border-radius:20px 20px 0 0;border-top:2px solid #1e3a5f;width:100%;max-width:600px;max-height:94vh;display:flex;flex-direction:column;font-family:Nunito,sans-serif;';
+    sheet.style.cssText = 'background:#0d1b2e;border-top:2px solid #1e3a5f;display:flex;flex-direction:column;font-family:Nunito,sans-serif;'
+      + (isWide
+          ? 'width:100%;max-width:min(1100px,92vw);max-height:90vh;border-radius:20px;border:2px solid #1e3a5f;'
+          : 'width:100%;max-width:600px;max-height:94vh;border-radius:20px 20px 0 0;');
     sheet.innerHTML = html;
     ov.appendChild(sheet);
     document.body.appendChild(ov);
