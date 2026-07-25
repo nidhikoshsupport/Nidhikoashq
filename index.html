@@ -12018,4 +12018,25 @@ window.__ftResetOrgDate = function() {
   setTimeout(renderBirthday,1500);
 })();
 </script>
+<script>
+(function(){
+  var BUILD_TAG = 'v67-BalanceSheet-AOA-Fix';
+  console.log('%cNidhiKosh BUILD: ' + BUILD_TAG, 'color:#22c55e;font-weight:bold;font-size:14px;');
+  window.__ftBuildTag = BUILD_TAG;
+  function showBadge(){
+    try{
+      var old = document.getElementById('ft-build-badge');
+      if (old && old.parentNode) old.parentNode.removeChild(old);
+      var b = document.createElement('div');
+      b.id = 'ft-build-badge';
+      b.textContent = BUILD_TAG;
+      b.style.cssText = 'position:fixed;top:2px;right:2px;background:#22c55e;color:#04160c;font-size:9px;font-weight:800;padding:2px 6px;border-radius:6px;z-index:2147483647;font-family:monospace;opacity:0.85;pointer-events:none;';
+      (document.body||document.documentElement).appendChild(b);
+    }catch(e){}
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') showBadge();
+  else document.addEventListener('DOMContentLoaded', showBadge);
+  setTimeout(showBadge, 1000);
+})();
+</script>
 </body></html>
