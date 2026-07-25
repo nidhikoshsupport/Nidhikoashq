@@ -8153,10 +8153,11 @@ react-dom/cjs/react-dom-client.production.js:
           aoa.push(['Total Receivables', totalRec]);
           aoa.push(['TOTAL', totalAssets]);
           if (diff2 >= 2) { aoa.push([]); aoa.push(['Difference', diff2]); }
+          alert('DEBUG v68: exporting ' + aoa.length + ' rows to Excel (AOA method)');
           var ws = window.XLSX.utils.aoa_to_sheet(aoa);
           var wb = window.XLSX.utils.book_new();
           window.XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
-          window.XLSX.writeFile(wb, 'Balance_Sheet.xlsx');
+          window.XLSX.writeFile(wb, 'Balance_Sheet_DEBUG_' + Date.now() + '.xlsx');
         }).catch(function(){
           alert('Could not load Excel export library. Check your internet connection and try again.');
         });
@@ -12020,7 +12021,7 @@ window.__ftResetOrgDate = function() {
 </script>
 <script>
 (function(){
-  var BUILD_TAG = 'v67-BalanceSheet-AOA-Fix';
+  var BUILD_TAG = 'v69-DEBUG-BalanceSheet';
   console.log('%cNidhiKosh BUILD: ' + BUILD_TAG, 'color:#22c55e;font-weight:bold;font-size:14px;');
   window.__ftBuildTag = BUILD_TAG;
   function showBadge(){
