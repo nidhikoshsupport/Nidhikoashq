@@ -1063,16 +1063,31 @@
       var maxCols = 1;
       function cellText(el){ return (el.textContent || '').replace(/\s+/g,' ').trim(); }
       function hasTableDescendant(el){ return !!el.querySelector('table'); }
-      function extractTable(node){
-        Array.prototype.forEach.call(node.rows, function(row){
-          var rowVals = [];
-          Array.prototype.forEach.call(row.cells, function(cell){
-            var span = cell.colSpan || 1;
-            rowVals.push(cellText(cell));
-            for (var s=1; s<span; s++) rowVals.push('');
-          });
-          if (rowVals.length > maxCols) maxCols = rowVals.length;
-          aoa.push(rowVals);
+      function extractTable(tableNode){
+        Array.prototype.forEach.call(tableNode.rows, function(row){
+          var cellsArr = Array.prototype.slice.call(row.cells);
+          var nestedCells = cellsArr.filter(function(c){ return c.querySelector('table'); });
+          if (nestedCells.length) {
+            // this row is a layout row (e.g. side-by-side sections) - unroll each cell in sequence
+            cellsArr.forEach(function(cell){
+              var nested = cell.querySelector('table');
+              if (nested) {
+                extractTable(nested);
+              } else {
+                var t = cellText(cell);
+                if (t) aoa.push([t]);
+              }
+            });
+          } else {
+            var rowVals = [];
+            cellsArr.forEach(function(cell){
+              var span = cell.colSpan || 1;
+              rowVals.push(cellText(cell));
+              for (var s=1; s<span; s++) rowVals.push('');
+            });
+            if (rowVals.length > maxCols) maxCols = rowVals.length;
+            aoa.push(rowVals);
+          }
         });
         aoa.push([]);
       }
@@ -8153,11 +8168,10 @@ react-dom/cjs/react-dom-client.production.js:
           aoa.push(['Total Receivables', totalRec]);
           aoa.push(['TOTAL', totalAssets]);
           if (diff2 >= 2) { aoa.push([]); aoa.push(['Difference', diff2]); }
-          alert('DEBUG v68: exporting ' + aoa.length + ' rows to Excel (AOA method)');
           var ws = window.XLSX.utils.aoa_to_sheet(aoa);
           var wb = window.XLSX.utils.book_new();
           window.XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
-          window.XLSX.writeFile(wb, 'Balance_Sheet_DEBUG_' + Date.now() + '.xlsx');
+          window.XLSX.writeFile(wb, 'Balance_Sheet.xlsx');
         }).catch(function(){
           alert('Could not load Excel export library. Check your internet connection and try again.');
         });
@@ -12021,7 +12035,7 @@ window.__ftResetOrgDate = function() {
 </script>
 <script>
 (function(){
-  var BUILD_TAG = 'v69-DEBUG-BalanceSheet';
+  var BUILD_TAG = 'v70-NestedTable-Excel-Fix';
   console.log('%cNidhiKosh BUILD: ' + BUILD_TAG, 'color:#22c55e;font-weight:bold;font-size:14px;');
   window.__ftBuildTag = BUILD_TAG;
   function showBadge(){
