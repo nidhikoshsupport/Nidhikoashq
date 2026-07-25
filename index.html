@@ -8126,10 +8126,40 @@ react-dom/cjs/react-dom-client.production.js:
       if (diff2 >= 2) tableHtml += '<p style="color:#b45309;font-weight:800;text-align:center;font-size:11px;">&#9888; Difference: &#8377;'+Math.round(diff2).toLocaleString('en-IN')+'</p>';
       var chips = [{label:'Total Assets', value:'&#8377;'+Math.abs(Math.round(totalAssets)).toLocaleString('en-IN'), color:'#4f46e5'},{label:'Member Capital', value:'&#8377;'+Math.abs(Math.round(memCap)).toLocaleString('en-IN'), color:'#b45309'},{label:surplus>=0?'Surplus':'Deficit', value:'&#8377;'+Math.abs(Math.round(surplus)).toLocaleString('en-IN'), color:surplus>=0?'#16a34a':'#dc2626'}];
       if (asExcel) {
-        if (window.__ftExportHtmlMultiTableSingleSheet) {
-          var bsExportHtml = '<div>LIABILITIES &amp; EQUITY</div>' + leftTbl + '<div>ASSETS</div>' + rightTbl;
-          window.__ftExportHtmlMultiTableSingleSheet(bsExportHtml, 'Balance_Sheet.xlsx', 'Balance Sheet');
-        }
+        (window.__ftLoadSheetJS ? window.__ftLoadSheetJS() : Promise.reject()).then(function(){
+          var aoa = [];
+          aoa.push(['LIABILITIES & EQUITY', '']);
+          aoa.push(['Fees Collected + Opening', memCap]);
+          aoa.push(['Total Member Capital', memCap]);
+          aoa.push([surplus>=0?'SURPLUS':'DEFICIT', '']);
+          aoa.push(['Interest Collected', intCollected]);
+          if (penCol>0) aoa.push(['Penalty Collected', penCol]);
+          if (otherInc>0) aoa.push(['Other Income', otherInc]);
+          if (expenses>0) aoa.push(['Less: Expenses', expenses]);
+          if (totalLoanWO>0) aoa.push(['Less: Loan Bad Debt', totalLoanWO]);
+          if (totalIntWO>0) aoa.push(['Less: Interest W/O', totalIntWO]);
+          if (feeWO>0) aoa.push(['Less: Fee W/O', feeWO]);
+          aoa.push([surplus>=0?'Net Surplus':'Net Deficit', surplus]);
+          aoa.push(['TOTAL', totalLE]);
+          aoa.push([]);
+          aoa.push(['ASSETS', '']);
+          aoa.push(['CASH & BANK', '']);
+          bankRows.forEach(function(r){ aoa.push([r.label, r.value]); });
+          aoa.push(['Total Cash & Bank', totalBank]);
+          aoa.push(['RECEIVABLES', '']);
+          aoa.push(['Loan Principal', netLoanRec]);
+          aoa.push(['Loan Interest', netIntRec]);
+          aoa.push(['Member Fee', feeRec]);
+          aoa.push(['Total Receivables', totalRec]);
+          aoa.push(['TOTAL', totalAssets]);
+          if (diff2 >= 2) { aoa.push([]); aoa.push(['Difference', diff2]); }
+          var ws = window.XLSX.utils.aoa_to_sheet(aoa);
+          var wb = window.XLSX.utils.book_new();
+          window.XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
+          window.XLSX.writeFile(wb, 'Balance_Sheet.xlsx');
+        }).catch(function(){
+          alert('Could not load Excel export library. Check your internet connection and try again.');
+        });
         return;
       }
       showPDF('Balance Sheet', today, orgName, today, chips, tableHtml);
