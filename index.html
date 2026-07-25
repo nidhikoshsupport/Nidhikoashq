@@ -1062,25 +1062,35 @@
       var aoa = [];
       var maxCols = 1;
       function cellText(el){ return (el.textContent || '').replace(/\s+/g,' ').trim(); }
-      Array.prototype.forEach.call(tmp.children, function(node){
-        var tag = (node.tagName || '').toLowerCase();
-        if (tag === 'div') {
-          var txt = cellText(node);
-          if (txt) { aoa.push([txt]); }
-        } else if (tag === 'table') {
-          Array.prototype.forEach.call(node.rows, function(row){
-            var rowVals = [];
-            Array.prototype.forEach.call(row.cells, function(cell){
-              var span = cell.colSpan || 1;
-              rowVals.push(cellText(cell));
-              for (var s=1; s<span; s++) rowVals.push('');
-            });
-            if (rowVals.length > maxCols) maxCols = rowVals.length;
-            aoa.push(rowVals);
+      function hasTableDescendant(el){ return !!el.querySelector('table'); }
+      function extractTable(node){
+        Array.prototype.forEach.call(node.rows, function(row){
+          var rowVals = [];
+          Array.prototype.forEach.call(row.cells, function(cell){
+            var span = cell.colSpan || 1;
+            rowVals.push(cellText(cell));
+            for (var s=1; s<span; s++) rowVals.push('');
           });
-          aoa.push([]);
-        }
-      });
+          if (rowVals.length > maxCols) maxCols = rowVals.length;
+          aoa.push(rowVals);
+        });
+        aoa.push([]);
+      }
+      function walk(container){
+        Array.prototype.forEach.call(container.children, function(node){
+          var tag = (node.tagName || '').toLowerCase();
+          if (tag === 'table') {
+            extractTable(node);
+          } else if (hasTableDescendant(node)) {
+            // container div wrapping a label + table (or more) - recurse to preserve order
+            walk(node);
+          } else {
+            var txt = cellText(node);
+            if (txt) { aoa.push([txt]); }
+          }
+        });
+      }
+      walk(tmp);
       if (!aoa.length) { alert('No table data found to export.'); tmp.remove(); return; }
       var ws = window.XLSX.utils.aoa_to_sheet(aoa);
       var wb = window.XLSX.utils.book_new();
@@ -8116,15 +8126,9 @@ react-dom/cjs/react-dom-client.production.js:
       if (diff2 >= 2) tableHtml += '<p style="color:#b45309;font-weight:800;text-align:center;font-size:11px;">&#9888; Difference: &#8377;'+Math.round(diff2).toLocaleString('en-IN')+'</p>';
       var chips = [{label:'Total Assets', value:'&#8377;'+Math.abs(Math.round(totalAssets)).toLocaleString('en-IN'), color:'#4f46e5'},{label:'Member Capital', value:'&#8377;'+Math.abs(Math.round(memCap)).toLocaleString('en-IN'), color:'#b45309'},{label:surplus>=0?'Surplus':'Deficit', value:'&#8377;'+Math.abs(Math.round(surplus)).toLocaleString('en-IN'), color:surplus>=0?'#16a34a':'#dc2626'}];
       if (asExcel) {
-        if (window.__ftExportTablesToExcel) {
-          var tmp = document.createElement('div');
-          tmp.style.cssText = 'position:absolute;left:-9999px;';
-          var lt = document.createElement('div'); lt.innerHTML = leftTbl; lt.querySelector('table').setAttribute('data-sheet-name','Liabilities-Equity');
-          var rt = document.createElement('div'); rt.innerHTML = rightTbl; rt.querySelector('table').setAttribute('data-sheet-name','Assets');
-          tmp.appendChild(lt); tmp.appendChild(rt);
-          document.body.appendChild(tmp);
-          window.__ftExportTablesToExcel(tmp, 'Balance_Sheet.xlsx');
-          setTimeout(function(){ tmp.remove(); }, 3000);
+        if (window.__ftExportHtmlMultiTableSingleSheet) {
+          var bsExportHtml = '<div>LIABILITIES &amp; EQUITY</div>' + leftTbl + '<div>ASSETS</div>' + rightTbl;
+          window.__ftExportHtmlMultiTableSingleSheet(bsExportHtml, 'Balance_Sheet.xlsx', 'Balance Sheet');
         }
         return;
       }
@@ -8420,8 +8424,9 @@ react-dom/cjs/react-dom-client.production.js:
 
     ov.querySelector('#ann-excel').onclick = function(){
       var yr = ov.querySelector('#ann-year').value;
-      if (window.__ftExportTablesToExcel) {
-        window.__ftExportTablesToExcel(ov.querySelector('#ann-body'), 'Annual_Report_'+yr+'.xlsx');
+      var r = buildReport(yr);
+      if (window.__ftExportHtmlMultiTableSingleSheet) {
+        window.__ftExportHtmlMultiTableSingleSheet(r.html, 'Annual_Report_'+yr+'.xlsx', 'Annual Report '+yr);
       }
     };
   };
