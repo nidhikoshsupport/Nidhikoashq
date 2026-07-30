@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "5.9"; window.__NK_BUILD_DATE = "2026-07-30";</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "6.0"; window.__NK_BUILD_DATE = "2026-07-30";</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -8614,6 +8614,11 @@ react-dom/cjs/react-dom-client.production.js:
         + '<td style="'+td+'text-align:right;font-weight:900;font-size:13px;color:'+zc+';border-top:2px solid #1e40af55;">'+fmtRs(z)+'</td>'
         + '</tr>';
       tableHTML += '</tbody></table>';
+      var _fsDiff = Math.abs(B - z);
+      var _fsOk = _fsDiff < 1;
+      tableHTML += '<div style="margin-top:14px;padding:12px 16px;border-radius:8px;background:'+(_fsOk?'#f0fdf4':'#fef2f2')+';border:1px solid '+(_fsOk?'#bbf7d0':'#fecaca')+';font-size:13px;font-weight:800;color:'+(_fsOk?'#16a34a':'#dc2626')+';text-align:center;">'
+        + (_fsOk ? '\u2705 Net Balance matches Bank + Cash Total' : '\u26A0\uFE0F Difference: '+fmtRs(_fsDiff)+' (Net Balance vs Bank + Cash Total)')
+        + '</div>';
     }
 
     showPDF(
