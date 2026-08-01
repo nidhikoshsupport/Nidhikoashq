@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "6.7"; window.__NK_BUILD_DATE = "2026-08-01";</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "6.8"; window.__NK_BUILD_DATE = "2026-08-01";</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -126,13 +126,21 @@
     if (_btn) return;
     _btn = document.createElement('div');
     _btn.id = 'ft-debug-fab';
-    _btn.textContent = '🔧';
-    _btn.style.cssText = 'position:fixed;right:14px;bottom:90px;width:44px;height:44px;border-radius:50%;background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;z-index:2147483647;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;border:2px solid #22C55E';
+    _btn.innerHTML = '📡';
+    _btn.title = 'Sync Log';
+    _btn.style.cssText = 'position:fixed;left:10px;bottom:14px;width:30px;height:30px;border-radius:50%;background:#1e3a5f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;z-index:2147483647;box-shadow:0 2px 8px rgba(0,0,0,.4);cursor:pointer;border:1.5px solid #22C55E88;opacity:0.55;transition:opacity .15s';
+    _btn.onmouseenter = function(){ _btn.style.opacity = '1'; };
+    _btn.onmouseleave = function(){ if(_panel.style.display==='none') _btn.style.opacity = '0.55'; };
     (document.body || document.documentElement).appendChild(_btn);
 
     _panel = document.createElement('div');
-    _panel.style.cssText = 'position:fixed;right:14px;bottom:140px;width:min(92vw,380px);max-height:55vh;overflow-y:auto;background:#060d1f;border:1px solid #22C55E55;border-radius:12px;padding:10px;z-index:2147483647;display:none;box-sizing:border-box;font-family:monospace;font-size:11px;color:#e2e8f0;white-space:normal';
+    _panel.style.cssText = 'position:fixed;left:10px;bottom:52px;width:min(92vw,380px);max-height:55vh;overflow-y:auto;background:#060d1f;border:1px solid #22C55E55;border-radius:12px;padding:10px;z-index:2147483647;display:none;box-sizing:border-box;font-family:monospace;font-size:11px;color:#e2e8f0;white-space:normal';
     (document.body || document.documentElement).appendChild(_panel);
+
+    var _title = document.createElement('div');
+    _title.textContent = '📡 Sync & Activity Log';
+    _title.style.cssText = 'font-family:sans-serif;font-weight:800;font-size:12px;color:#4ade80;margin-bottom:8px;letter-spacing:.3px';
+    _panel.appendChild(_title);
 
     _list = document.createElement('div');
     _panel.appendChild(_list);
@@ -144,7 +152,9 @@
     _panel.appendChild(clearBtn);
 
     _btn.onclick = function(){
-      _panel.style.display = (_panel.style.display === 'none') ? 'block' : 'none';
+      var showing = _panel.style.display !== 'none';
+      _panel.style.display = showing ? 'none' : 'block';
+      _btn.style.opacity = showing ? '0.55' : '1';
     };
   }
 
