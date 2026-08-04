@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.1.4"; window.__NK_BUILD_DATE = "2026-08-05"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.1.5"; window.__NK_BUILD_DATE = "2026-08-05"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -4774,6 +4774,90 @@ react-dom/cjs/react-dom-client.production.js:
 
   window.sharePDFOnWhatsApp = sharePDFOnWhatsApp;
 
+  // Single-page variant for short documents (e.g. donation receipts) where forcing
+  // standard A4 pagination leaves an almost-empty trailing second page. This makes
+  // the PDF page exactly match the captured content's own size instead.
+  function shareSinglePagePDF(innerEl, title, btn) {
+    var origLabel = btn.innerHTML;
+    btn.innerHTML = '\u23f3 Wait\u2026';
+    btn.disabled = true;
+    var done = function(){ btn.innerHTML = origLabel; btn.disabled = false; };
+
+    _ensurePDFLibs().then(function() {
+      var prevTransform = innerEl.style.transform;
+      var prevWidth = innerEl.style.width;
+      innerEl.style.transform = 'none';
+      innerEl.style.width = '794px';
+
+      var _waitForReflow = new Promise(function(resolve){
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){
+            setTimeout(resolve, 50);
+          });
+        });
+      });
+
+      return _waitForReflow.then(function(){
+        return window.html2canvas(innerEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      })
+        .then(function(canvas) {
+          innerEl.style.transform = prevTransform;
+          innerEl.style.width = prevWidth;
+
+          if (!canvas || canvas.width < 10 || canvas.height < 10) {
+            _toastPDF('PDF तयार करता आलं नाही (रिकामं content). कृपया पुन्हा प्रयत्न करा किंवा App ला कळवा.', '#b91c1c');
+            done();
+            return;
+          }
+
+          var jsPDF = window.jspdf.jsPDF;
+          var margin = 8;
+          var imgWmm = 210 - margin * 2;
+          var pxPerMM = canvas.width / imgWmm;
+          var imgHmm = canvas.height / pxPerMM;
+          var pageWmm = imgWmm + margin * 2;
+          var pageHmm = imgHmm + margin * 2;
+
+          var pdf = new jsPDF({ orientation: pageHmm >= pageWmm ? 'p' : 'l', unit: 'mm', format: [pageWmm, pageHmm] });
+          var imgData = canvas.toDataURL('image/jpeg', 0.92);
+          pdf.addImage(imgData, 'JPEG', margin, margin, imgWmm, imgHmm);
+
+          var safeName = (title || 'Document').replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '_');
+          var d = new Date();
+          var fname = safeName + '_' + d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '.pdf';
+          var blob = pdf.output('blob');
+
+          var _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          if (_isIOS) {
+            pdf.save(fname);
+            _toastPDF('\ud83d\udcc4 PDF saved \u2014 open it and use the share icon to send on WhatsApp');
+            done();
+            return;
+          }
+          var file = null;
+          try { file = new File([blob], fname, { type: 'application/pdf' }); } catch (e) {}
+          if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: title })
+              .catch(function(err) {
+                if (!err || err.name !== 'AbortError') _openPDFBlob(blob, fname);
+              })
+              .then(done, done);
+          } else {
+            _openPDFBlob(blob, fname);
+            done();
+          }
+        });
+    }).catch(function(err) {
+      done();
+      if (err && String(err.message).indexOf('load failed') === 0) {
+        _toastPDF('\u26a0\ufe0f Internet needed to create the PDF. Connect and try again.', '#b45309');
+      } else {
+        _toastPDF('\u26a0\ufe0f PDF error: ' + (err && err.message ? err.message : err), '#e53535');
+      }
+    });
+  }
+  window.shareSinglePagePDF = shareSinglePagePDF;
+
   function _openPDFBlob(blob, fname) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -9089,7 +9173,7 @@ react-dom/cjs/react-dom-client.production.js:
       var btn = document.getElementById('receipt-share-btn');
       if (el && btn && window.sharePDFOnWhatsApp) {
         var title = 'Receipt_' + ((r && r.receiptNo) || Date.now());
-        window.sharePDFOnWhatsApp(el, title, btn);
+        window.shareSinglePagePDF(el, title, btn);
         return;
       }
       // Fallback to a text share if the PDF content/button isn't available for some reason
