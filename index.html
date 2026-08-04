@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.0.9"; window.__NK_BUILD_DATE = "2026-08-04"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.1.0"; window.__NK_BUILD_DATE = "2026-08-04"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -266,10 +266,31 @@
 
   function _waitForAuth(cb){
     if (window.__fbAuthReady) { cb(); return; }
-    window.addEventListener('ft-fb-auth-ready', function once(){
-      window.removeEventListener('ft-fb-auth-ready', once);
+    var _done = false;
+    var _fire = function(){
+      if (_done) return;
+      _done = true;
+      window.removeEventListener('ft-fb-auth-ready', _fire);
       cb();
-    });
+    };
+    window.addEventListener('ft-fb-auth-ready', _fire);
+    // Safety net: the one-time 'ft-fb-auth-ready' event can be missed (e.g. a long-idle
+    // standalone/Home-Screen session where this listener gets attached after the event
+    // already fired once elsewhere, or a timing race on iOS WebKit) -- in that case this
+    // callback would otherwise wait forever. Poll firebase.auth().currentUser directly as
+    // a fallback so a stuck save eventually goes through instead of queueing indefinitely.
+    var _tries = 0;
+    var _poll = setInterval(function(){
+      _tries++;
+      if (_done) { clearInterval(_poll); return; }
+      if (window.firebase && firebase.auth && firebase.auth().currentUser) {
+        window.__fbAuthReady = true;
+        clearInterval(_poll);
+        _fire();
+      } else if (_tries > 30) { // ~15s of polling at 500ms
+        clearInterval(_poll);
+      }
+    }, 500);
   }
 
   function _pushFieldToCloud(orgId, suffix, jsonStr){
