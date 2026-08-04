@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.1.1"; window.__NK_BUILD_DATE = "2026-08-04"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.1.2"; window.__NK_BUILD_DATE = "2026-08-04"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -701,13 +701,32 @@
     provider.setCustomParameters({ prompt: 'select_account' });
     var _ua = navigator.userAgent || '';
     var _isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(_ua);
+    var _isIOS = /iPad|iPhone|iPod/.test(_ua);
     var _isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-    // Installed/standalone windows (desktop "Save as homepage", iOS "Add to Home Screen")
+    // Installed/standalone windows (desktop "Save as homepage", Android "Add to Home Screen")
     // routinely report the sign-in popup as closed even though the user never touched it --
     // go straight to redirect-based sign-in in that case, which is far more reliable there.
-    // Safari (in a normal tab, NOT standalone) is the opposite: its Intelligent Tracking
-    // Prevention frequently drops the state redirect sign-in depends on, so popup is the
-    // more reliable choice there and we deliberately do NOT fall back to redirect on failure.
+    // iOS "Add to Home Screen" is a special case of its own: a full-page redirect there
+    // breaks out into Safari itself and never returns to the standalone app, so redirect
+    // sign-in can never complete -- popup (shown as an in-app sheet by WebKit, without
+    // leaving the installed app) is the one that actually works on iOS standalone.
+    if (_isStandalone && _isIOS) {
+      if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped (iOS Home Screen app) -- using popup (redirect cannot return here)...','info');
+      firebase.auth().signInWithPopup(provider).then(function(result){
+        _ftGoogleInProgress = false;
+        var user = result && result.user;
+        if (!user) { if(window.__ftDebugLog)window.__ftDebugLog('Popup sign-in: no user returned','error'); return; }
+        if(window.__ftDebugLog)window.__ftDebugLog('Popup sign-in OK, uid='+user.uid+' email='+user.email,'ok');
+        if (window.__ftHandleGoogleUser) window.__ftHandleGoogleUser(user);
+      }).catch(function(e){
+        _ftGoogleInProgress = false;
+        if(window.__ftDebugLog)window.__ftDebugLog('Google sign-in FAILED (iOS Home Screen app): '+(e&&e.code)+' -- '+(e&&e.message||e),'error');
+        if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+          alert('Google sign-in failed: ' + (e && e.message || e));
+        }
+      });
+      return;
+    }
     if (_isStandalone) {
       if(window.__ftDebugLog)window.__ftDebugLog('Continue with Google tapped (standalone window) -- using redirect sign-in...','info');
       firebase.auth().signInWithRedirect(provider).catch(function(e){
