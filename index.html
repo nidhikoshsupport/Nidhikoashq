@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.6.9"; window.__NK_BUILD_DATE = "2026-08-16"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.7.0"; window.__NK_BUILD_DATE = "2026-08-16"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -5442,34 +5442,33 @@ react-dom/cjs/react-dom-client.production.js:
           (mbr.fees || []).slice().sort(function(a,b){ return (a.month||'') > (b.month||'') ? 1 : -1; }).forEach(function(fee) {
             if (fromDate && fee.month && fee.month < fromDate.slice(0,7)) return;
             if (toDate   && fee.month && fee.month > toDate.slice(0,7))   return;
-            feeLeft.push({date: fee.month || '-', desc: 'Monthly Fee Due', amt: fee.amount || 0});
+            if (fee.isAdvance) return;
+            var _dueDesc = 'Monthly Fee Due' + (fee.paid ? ' (' + (fee.bank || 'Paid') + ')' : '');
+            feeLeft.push({date: fee.month || '-', desc: _dueDesc, amt: fee.amount || 0});
             totalDue += fee.amount || 0;
           });
 
-          // Right: Payments received - use actual bank transactions
-          var allBanks = [];
-          try { allBanks = getBanks(); } catch(e) {}
-          var mbrBankTxns = [];
-          allBanks.forEach(function(bk) {
-            (bk.transactions || []).forEach(function(t) {
-              if (String(t.memberId) === String(mbr.id) && t.type === 'credit' && (t.desc||'').indexOf('Fee - ') === 0 && (!fromDate||t.date>=fromDate) && (!toDate||t.date<=toDate)) {
-                mbrBankTxns.push({date: t.date, desc: bk.name, amt: Math.abs(t.amount || 0)});
-              }
-            });
+          // Right: Payments received - built from the member's own fee entries (source of truth)
+          var _feeWoAmt=0;
+          var _crRows=[];
+          (mbr.fees || []).forEach(function(fee) {
+            if (fromDate && fee.month && fee.month < fromDate.slice(0,7)) return;
+            if (toDate   && fee.month && fee.month > toDate.slice(0,7))   return;
+            if (fee.isAdvance) {
+              if (fee.paid) return;
+              var _advAmt = Math.abs(fee.amount || 0);
+              var _advDate = fee.paidDate || fee.month || '';
+              _crRows.push({rawDate:_advDate, date: fmtDate(_advDate), desc: (fee.bank ? 'Payment' : 'Advance') + (fee.bank ? ' - '+fee.bank : ''), amt: _advAmt});
+              return;
+            }
+            if (!fee.paid) return;
+            if (fee.bank === 'Write Off') { _feeWoAmt += fee.amtReceived!=null?fee.amtReceived:fee.amount; return; }
+            var recvAmt = fee.amtReceived != null ? fee.amtReceived : fee.amount;
+            _crRows.push({rawDate: fee.paidDate, date: fmtDate(fee.paidDate), desc: (fee.month||'-') + ' - ' + (fee.bank||'Cash'), amt: recvAmt});
           });
-          mbrBankTxns.sort(function(a,b){ return a.date > b.date ? 1 : a.date < b.date ? -1 : 0; });
-          if (mbrBankTxns.length > 0) {
-            mbrBankTxns.forEach(function(t) { feeRight.push({date: fmtDate(t.date), desc: t.desc, amt: t.amt}); totalReceived += t.amt; });
-          } else {
-            var _feeWoAmt=0;
-            (mbr.fees || []).filter(function(f){ return f.paid; }).forEach(function(fee) {
-              if (fee.bank === 'Write Off') { _feeWoAmt += fee.amtReceived!=null?fee.amtReceived:fee.amount; return; }
-              var recvAmt = fee.amtReceived != null ? fee.amtReceived : fee.amount;
-              feeRight.push({date: fmtDate(fee.paidDate), desc: (fee.month||'-') + ' - ' + (fee.bank||'Cash'), amt: recvAmt});
-              totalReceived += recvAmt;
-            });
-            if (_feeWoAmt > 0) { var _feeWoDates=(mbr.writeOffs||[]).filter(function(w){return w.type==='fee';}).map(function(w){return w.date;}).sort(); feeRight.push({date: _feeWoDates.length?fmtDate(_feeWoDates[0]):'', rawDate:_feeWoDates[0]||'', desc: 'Write Off', amt: _feeWoAmt, isWO: true}); }
-          }
+          _crRows.sort(function(a,b){ return (a.rawDate||'') > (b.rawDate||'') ? 1 : (a.rawDate||'') < (b.rawDate||'') ? -1 : 0; });
+          _crRows.forEach(function(r){ feeRight.push({date:r.date, desc:r.desc, amt:r.amt}); totalReceived += r.amt; });
+          if (_feeWoAmt > 0) { var _feeWoDates=(mbr.writeOffs||[]).filter(function(w){return w.type==='fee';}).map(function(w){return w.date;}).sort(); feeRight.push({date: _feeWoDates.length?fmtDate(_feeWoDates[0]):'', rawDate:_feeWoDates[0]||'', desc: 'Write Off', amt: _feeWoAmt, isWO: true}); }
 
           var _feeWoAmt2 = (typeof _feeWoAmt!=='undefined')?_feeWoAmt:0;
           var feeNet = totalDue - totalReceived - _feeWoAmt2;
@@ -5481,7 +5480,7 @@ react-dom/cjs/react-dom-client.production.js:
           ].filter(Boolean));
           html += '<div style="font-size:12px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">1. Fee Account</div>';
           html += feeChip;
-          html += tAccount('#16a34a', '#1e40af', 'Capital & Dues (Dr)', 'Payments Received (Cr)', feeLeft, feeRight, totalDue, totalReceived+_feeWoAmt2, 'Balance Due', feeNet);
+          html += tAccount('#16a34a', '#1e40af', 'Dues (Dr)', 'Payments Received (Cr)', feeLeft, feeRight, totalDue, totalReceived+_feeWoAmt2, 'Balance Due', feeNet);
         }
 
         // ── SECTION 2: LOAN ACCOUNT ────────────────────────
