@@ -5,7 +5,7 @@
   in whole or in part, without express written permission, is prohibited.
   Contact: nidhikosh.support@gmail.com
 -->
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.7.1"; window.__NK_BUILD_DATE = "2026-08-16"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NidhiKosh"><meta name="theme-color" content="#060d1f"><title>NidhiKosh</title><script>window.__NK_APP_VERSION = "1.7.2"; window.__NK_BUILD_DATE = "2026-08-16"; window.__NK_IS_PRODUCTION = false;</script><style>*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{background:#060d1f;font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto}#root{min-height:100vh}@media(min-width:768px){body{max-width:900px!important}#nav{max-width:900px!important}}@media(min-width:1024px){body{max-width:1100px!important}#nav{max-width:1100px!important}}</style>
 
 
 
@@ -5400,7 +5400,7 @@ react-dom/cjs/react-dom-client.production.js:
 
         // Member name header
         if (!memberId) {
-          html += '<div style="font-weight:900;font-size:14px;color:#f1f5f9;padding:8px 0 6px;border-bottom:2px solid #1e3a5f;margin-bottom:10px;">'+mbr.name+' <span style="font-size:11px;color:#4a6fa5;font-weight:400;">Sr. No. '+mbr.id+'</span></div>';
+          html += '<div style="font-weight:900;font-size:14px;color:#f1f5f9;padding:8px 0 6px;border-bottom:2px solid #1e3a5f;margin-bottom:10px;">'+mbr.name+' <span style="font-size:11px;color:#4a6fa5;font-weight:400;">Sr. No. '+(mbr.memberNo||mbr.id)+'</span></div>';
         }
 
         // ── SECTION 1: FEE ACCOUNT ─────────────────────────
@@ -5938,7 +5938,7 @@ react-dom/cjs/react-dom-client.production.js:
 
       filtered.forEach(function(mbr) {
         if (filtered.length > 1)
-          allTableHTML += '<div style="font-size:13px;font-weight:900;color:#1e293b;margin:16px 0 6px;padding:6px 0;border-bottom:2px solid #1e293b;">'+mbr.name+' — Sr. No. '+mbr.id+'</div>';
+          allTableHTML += '<div style="font-size:13px;font-weight:900;color:#1e293b;margin:16px 0 6px;padding:6px 0;border-bottom:2px solid #1e293b;">'+mbr.name+' — Sr. No. '+(mbr.memberNo||mbr.id)+'</div>';
 
         // ── 1. FEE ACCOUNT ──────────────────────────────────
         if (_pHasType('fee')) {
